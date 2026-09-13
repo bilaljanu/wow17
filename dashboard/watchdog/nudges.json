@@ -1,0 +1,127 @@
+[
+  {
+    "timestamp": "2026-09-08T16:02:50.884150+00:00",
+    "target": "dashboard [c7ec2e]",
+    "message": "[WATCHDOG NUDGE] You appear to be idle for 120 minutes. Please continue your work or report status."
+  },
+  {
+    "timestamp": "2026-09-08T16:02:50.884455+00:00",
+    "target": "mc-1.21.1 web port + plugin [60a248]",
+    "message": "[WATCHDOG NUDGE] You appear to be idle for 300 minutes. Please continue your work or report status."
+  },
+  {
+    "timestamp": "2026-09-08T16:18:03.272073+00:00",
+    "target": "dashboard [c7ec2e]",
+    "message": "[WATCHDOG NUDGE] You appear to be idle for 120 minutes. Please continue your work or report status."
+  },
+  {
+    "timestamp": "2026-09-08T16:37:54.501252+00:00",
+    "target": "dashboard [c7ec2e]",
+    "message": "[WATCHDOG NUDGE] You appear to be idle for 120 minutes. Please continue your work or report status."
+  },
+  {
+    "timestamp": "2026-09-08T16:45:56.407900+00:00",
+    "target": "dashboard [c7ec2e]",
+    "message": "[WATCHDOG NUDGE] You appear to be idle for 120 minutes. Please continue your work or report status."
+  },
+  {
+    "timestamp": "2026-09-08T17:07:55.438388+00:00",
+    "target": "dashboard [c7ec2e]",
+    "message": "[WATCHDOG NUDGE] You appear to be idle for 180 minutes. Please continue your work or report status."
+  },
+  {
+    "timestamp": "2026-09-08T17:07:55.438856+00:00",
+    "target": "mc-1.21.1 web port + plugin [60a248]",
+    "message": "[WATCHDOG NUDGE] You appear to be idle for 360 minutes. Please continue your work or report status."
+  },
+  {
+    "timestamp": "2026-09-08T17:21:37.861097+00:00",
+    "target": "dashboard [c7ec2e]",
+    "message": "[WATCHDOG NUDGE] You appear to be idle for 180 minutes. Please continue your work or report status."
+  },
+  {
+    "timestamp": "2026-09-08T17:31:40.825791+00:00",
+    "target": "dashboard [c7ec2e]",
+    "message": "[WATCHDOG NUDGE] You appear to be idle for 180 minutes. Please continue your work or report status."
+  },
+  {
+    "timestamp": "2026-09-08T17:39:22.875499+00:00",
+    "target": "dashboard [c7ec2e]",
+    "message": "[WATCHDOG NUDGE] You appear to be idle for 180 minutes. Please continue your work or report status."
+  },
+  {
+    "timestamp": "2026-09-08T17:46:15.611223+00:00",
+    "target": "dashboard [c7ec2e]",
+    "message": "[WATCHDOG NUDGE] You appear to be idle for 180 minutes. Please continue your work or report status."
+  },
+  {
+    "timestamp": "2026-09-08T17:46:15.611497+00:00",
+    "target": "agent [0870db]",
+    "message": "[WATCHDOG NUDGE] You appear to be idle for 360 minutes. Please continue your work or report status."
+  },
+  {
+    "timestamp": "2026-09-08T17:56:13.623372+00:00",
+    "target": "dashboard [c7ec2e]",
+    "message": "[WATCHDOG NUDGE] You appear to be idle for 240 minutes. Please continue your work or report status."
+  },
+  {
+    "timestamp": "2026-09-08T17:56:13.623719+00:00",
+    "target": "agent [0870db]",
+    "message": "[WATCHDOG NUDGE] You appear to be idle for 360 minutes. Please continue your work or report status."
+  },
+  {
+    "timestamp": "2026-09-08T17:56:13.623991+00:00",
+    "target": "mc-1.21.1 web port + plugin [60a248]",
+    "message": "[WATCHDOG NUDGE] You appear to be idle for 420 minutes. Please continue your work or report status."
+  },
+  {
+    "timestamp": "2026-09-08T18:02:53.133564+00:00",
+    "target": "dashboard [c7ec2e]",
+    "message": "[WATCHDOG NUDGE] You appear to be idle for 240 minutes. Please continue your work or report status."
+  },
+  {
+    "timestamp": "2026-09-08T18:02:53.133821+00:00",
+    "target": "agent [0870db]",
+    "message": "[WATCHDOG NUDGE] You appear to be idle for 360 minutes. Please continue your work or report status."
+  },
+  {
+    "timestamp": "2026-09-08T18:02:53.134069+00:00",
+    "target": "mc-1.21.1 web port + plugin [60a248]",
+    "message": "[WATCHDOG NUDGE] You appear to be idle for 420 minutes. Please continue your work or report status."
+  },
+  {
+    "timestamp": "2026-09-08T18:10:47.805488+00:00",
+    "target": "dashboard [c7ec2e]",
+    "message": "[WATCHDOG NUDGE] You appear to be idle for 240 minutes. Please continue your work or report status."
+  },
+  {
+    "timestamp": "2026-09-08T18:10:47.805795+00:00",
+    "target": "mc-1.21.1 web port + plugin [60a248]",
+    "message": "[WATCHDOG NUDGE] You appear to be idle for 420 minutes. Please continue your work or report status."
+  },
+  {
+    "timestamp": "2026-09-09T21:08:19.599025+00:00",
+    "target": "agent [db3106]",
+    "message": "[WATCHDOG NUDGE] You appear to be idle for 60 minutes. Please continue your work or report status."
+  },
+  {
+    "timestamp": "2026-09-09T21:09:14.329893+00:00",
+    "target": "agent [db3106]",
+    "message": "[WATCHDOG EVIDENCE REQUEST] Your message claimed \"Task complete: Plugin joinServer support for Minecraft 1...\" but included no raw output, log excerpt, grep result, specific line numbers, or other concrete checkable detail to substantiate this. Please re-send with the actual command output/log excerpt that demonstrates this, or reply 'unverified' if you cannot produce it."
+  },
+  {
+    "timestamp": "2026-09-09T21:09:43.407367+00:00",
+    "target": "agent [db3106]",
+    "message": "[WATCHDOG ESCALATION] Your previous claim \"Task complete: The plugin is fully implemented and verified...\" was challenged for lack of evidence, but you've repeated it without providing any raw output, log excerpt, grep result, or other concrete evidence. Please re-send with the actual command output/log excerpt that demonstrates this, or reply 'unverified' if you cannot produce it."
+  },
+  {
+    "timestamp": "2026-09-09T21:10:06.693071+00:00",
+    "target": "agent [db3106]",
+    "message": "[WATCHDOG NUDGE] You appear to be idle for 60 minutes. Please continue your work or report status."
+  },
+  {
+    "timestamp": "2026-09-09T21:10:28.639582+00:00",
+    "target": "agent [db3106]",
+    "message": "[WATCHDOG NUDGE] You appear to be idle for 60 minutes. Please continue your work or report status."
+  }
+]

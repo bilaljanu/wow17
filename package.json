@@ -1,0 +1,10 @@
+{
+  "dependencies": {
+    "@roamhq/wrtc": "^0.10.0",
+    "mcjs": "^2.0.0",
+    "mcprotocol": "^0.1.2",
+    "minecraft-protocol": "^1.68.0",
+    "node-pre-gyp": "^0.17.0",
+    "ws": "^8.21.3"
+  }
+}

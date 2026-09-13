@@ -1,0 +1,11 @@
+Starting net.minecraft.server.Main
+[00:28:00] [ServerMain/INFO]: Environment: Environment[sessionHost=https://sessionserver.mojang.com, servicesHost=https://api.minecraftservices.com, name=PROD]
+[00:28:00] [ServerMain/ERROR]: Failed to start the minecraft server
+axt$a: /home/bilal/wow17/./world/session.lock: already locked (possibly by other Minecraft instance?)
+	at axt$a.a(SourceFile:95) ~[server-1.21.1.jar:?]
+	at axt.a(SourceFile:41) ~[server-1.21.1.jar:?]
+	at erf$c.<init>(SourceFile:374) ~[server-1.21.1.jar:?]
+	at erf.d(SourceFile:353) ~[server-1.21.1.jar:?]
+	at net.minecraft.server.Main.main(SourceFile:137) ~[server-1.21.1.jar:?]
+	at net.minecraft.bundler.Main.lambda$run$0(Main.java:54) ~[?:?]
+	at java.base/java.lang.Thread.run(Thread.java:1583) [?:?]

@@ -1,0 +1,33 @@
+package poc.networking;
+
+import org.teavm.jso.JSBody;
+import org.teavm.jso.JSClass;
+import org.teavm.jso.typedarrays.Uint8Array;
+
+@JSClass
+public final class JsNetBridge {
+
+    private JsNetBridge() {}
+
+    @JSBody(params = {}, script = "window.NetBridgeBridge = window.NetBridgeBridge || {}; window.NetBridgeBridge.attach = true;")
+    public static native void onAttach();
+
+    @JSBody(params = "data", script = "if (window.NetBridgeBridge && window.NetBridgeBridge.sendBytes) { window.NetBridgeBridge.sendBytes(new Uint8Array(data)); }")
+    public static native void sendBytes(byte[] data);
+
+    @JSBody(params = {}, script = "if (window.NetBridgeBridge && window.NetBridgeBridge.onClose) { window.NetBridgeBridge.onClose(); }")
+    public static native void onClose();
+
+    /** Called from JS when a message arrives on the DataChannel */
+    public static void onReceive(byte[] data) {
+        NetBridge.onReceive(data);
+    }
+
+    /** Force export: assign internal function to window */
+    @JSBody(params = {}, script = "window.NetBridge_writePacket = pn_NetBridge_writePacket;")
+    public static native void exportWritePacket();
+
+    /** Force export: assign internal function to window */
+    @JSBody(params = {}, script = "window.NetBridge_onReceive = pn_NetBridge_onReceive;")
+    public static native void exportOnReceive();
+}

@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Minecraft WebRTC Bridge</title>
+    <style>
+        body { font-family: monospace; margin: 20px; }
+        #status { padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .waiting { background: #fff3cd; border: 1px solid #ffc107; }
+        .ready { background: #d4edda; border: 1px solid #28a745; }
+        .error { background: #f8d7da; border: 1px solid #dc3545; }
+        #output { white-space: pre-wrap; background: #f0f0f0; padding: 10px; border: 1px solid #ccc; height: 300px; overflow: auto; }
+        button { padding: 10px 20px; font-size: 16px; margin: 5px; }
+        #connectBtn { background: #4CAF50; color: white; border: none; }
+        #disconnectBtn { background: #f44336; color: white; border: none; }
+    </style>
+</head>
+<body>
+    <h1>Minecraft WebRTC Bridge</h1>
+    <div id="status" class="status waiting">Initializing WebRTC connection...</div>
+    <div>
+        <button id="connectBtn">Connect to Server</button>
+        <button id="disconnectBtn" disabled>Disconnect</button>
+    </div>
+    <div id="output"></div>
+
+    <script>
+        // Capture console.log
+        const oldLog = console.log;
+        console.log = function(...args) {
+            const output = document.getElementById('output');
+            output.textContent += args.map(arg =>
+                typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+            ).join(' ') + '\n';
+            output.scrollTop = output.scrollHeight;
+            oldLog.apply(console, args);
+        };
+
+        // Override console.error too
+        const oldError = console.error;
+        console.error = function(...args) {
+            const output = document.getElementById('output');
+            output.textContent += '[ERROR] ' + args.map(arg =>
+                typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+            ).join(' ') + '\n';
+            output.scrollTop = output.scrollHeight;
+            oldError.apply(console, args);
+        };
+
+        function updateStatus(message, className) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = 'status ' + className;
+        }
+
+        // WebRTC variables
+        let peerConnection = null;
+        let dataChannel = null;
+        let signalingSocket = null;
+        let isInitiator = false;
+
+        // NetBridgeBridge interface for TeaVM
+        window.NetBridgeBridge = {
+            attach: true,
+            sendBytes: function(data) {
+                if (dataChannel && dataChannel.readyState === 'open') {
+                    try {
+                        dataChannel.send(data);
+                        console.log('[WebRTC] Sent', data.length, 'bytes via DataChannel');
+                    } catch (e) {
+                        console.error('[WebRTC] Failed to send via DataChannel:', e);
+                    }
+                } else {
+                    console.warn('[WebRTC] DataChannel not ready, queuing', data.length, 'bytes');
+                }
+            },
+            onClose: function() {
+                console.log('[WebRTC] Connection closed');
+                cleanup();
+                updateStatus('Disconnected', 'waiting');
+                document.getElementById('connectBtn').disabled = false;
+                document.getElementById('disconnectBtn').disabled = true;
+            },
+            onJoinServer: function(host, port) {
+                console.log('[WebRTC] joinServer called with', host, port);
+                // For testing, we'll connect to our local proxy
+                connectToProxy('localhost', 8766);
+            }
+        };
+
+        function setupDataChannel() {
+            if (!dataChannel) return;
+
+            dataChannel.onopen = () => {
+                console.log('[WebRTC] DataChannel opened');
+                updateStatus('WebRTC DataChannel connected!', 'ready');
+            };
+
+            dataChannel.onclose = () => {
+                console.log('[WebRTC] DataChannel closed');
+                cleanup();
+                updateStatus('Disconnected', 'waiting');
+                document.getElementById('connectBtn').disabled = false;
+                document.getElementById('disconnectBtn').disabled = true;
+            };
+
+            dataChannel.onerror = (error) => {
+                console.error('[WebRTC] DataChannel error:', error);
+            };
+
+            dataChannel.onmessage = (event) => {
+                console.log('[WebRTC] Received', event.data.length, 'bytes from DataChannel');
+                // Forward to NetBridge
+                if (typeof window.NetBridge_receivePacket === 'function') {
+                    window.NetBridge_receivePacket(event.data);
+                } else if (window.NetBridgeBridge && typeof window.NetBridgeBridge.onMessage === 'function') {
+                    // Alternative interface
+                    window.NetBridgeBridge.onMessage(event.data);
+                }
+            };
+        }
+
+        function createPeerConnection(isInitiatorParam) {
+            isInitiator = isInitiatorParam;
+
+            const configuration = {
+                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+            };
+
+            peerConnection = new RTCPeerConnection(configuration);
+
+            // Handle ICE candidates
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    signalingSocket.send(JSON.stringify({
+                        type: 'ice-candidate',
+                        candidate: event.candidate
+                    }));
+                }
+            };
+
+            // Handle connection state changes
+            peerConnection.onconnectionstatechange = () => {
+                if (!peerConnection) return;
+                console.log('[WebRTC] Peer connection state:', peerConnection.connectionState);
+                if (peerConnection.connectionState === 'failed' ||
+                    peerConnection.connectionState === 'disconnected' ||
+                    peerConnection.connectionState === 'closed') {
+                    cleanup();
+                }
+            };
+
+            // Handle ICE gathering state changes
+            peerConnection.onicegatheringstatechange = () => {
+                console.log('[WebRTC] ICE gathering state:', peerConnection.iceGatheringState);
+                if (peerConnection.iceGatheringState === 'complete') {
+                    console.log('[WebRTC] ICE gathering complete');
+                }
+            };
+
+            // Create data channel
+            if (isInitiator) {
+                dataChannel = peerConnection.createDataChannel('minecraft');
+                setupDataChannel();
+            } else {
+                peerConnection.ondatachannel = (event) => {
+                    dataChannel = event.channel;
+                    setupDataChannel();
+                };
+            }
+
+            return peerConnection;
+        }
+
+        function connectToProxy(host, port) {
+            console.log('[WebRTC] Connecting to signaling server at', host, port);
+
+            // Close existing connection
+            cleanup();
+
+            // Create WebSocket for signaling
+            signalingSocket = new WebSocket(`ws://${host}:${port}`);
+
+            signalingSocket.onopen = () => {
+                console.log('[WebRTC] Signaling connected');
+                updateStatus('Signaling connected, establishing WebRTC...', 'waiting');
+
+                // Create peer connection (we're the initiator)
+                createPeerConnection(true);
+
+                // Create offer
+                peerConnection.createOffer()
+                    .then(offer => peerConnection.setLocalDescription(offer))
+                    .then(() => {
+                        signalingSocket.send(JSON.stringify({
+                            type: 'offer',
+                            sdp: peerConnection.localDescription
+                        }));
+                    })
+                    .catch(err => {
+                        console.error('[WebRTC] Error creating offer:', err);
+                        updateStatus('Failed to create offer: ' + err.message, 'error');
+                    });
+            };
+
+            signalingSocket.onmessage = async (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+
+                    switch (data.type) {
+                        case 'offer':
+                            console.log('[WebRTC] Received offer');
+                            if (!peerConnection) createPeerConnection(false);
+
+                            await peerConnection.setRemoteDescription(new RTCSessionDescription(data));
+                            const answer = await peerConnection.createAnswer();
+                            await peerConnection.setLocalDescription(answer);
+
+                            signalingSocket.send(JSON.stringify({
+                                type: 'answer',
+                                sdp: peerConnection.localDescription
+                            }));
+                            break;
+
+                        case 'answer':
+                            console.log('[WebRTC] Received answer');
+                            await peerConnection.setRemoteDescription(new RTCSessionDescription(data));
+                            break;
+
+                        case 'ice-candidate':
+                            if (peerConnection && data.candidate) {
+                                try {
+                                    await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+                                } catch (err) {
+                                    console.error('[WebRTC] Error adding ICE candidate:', err);
+                                }
+                            }
+                            break;
+
+                        case 'ping':
+                            // Respond to ping to keep connection alive
+                            signalingSocket.send(JSON.stringify({ type: 'pong' }));
+                            break;
+
+                        default:
+                            console.log('[WebRTC] Unknown message type:', data.type);
+                    }
+                } catch (e) {
+                    console.error('[WebRTC] Error parsing message:', e);
+                }
+            };
+
+            signalingSocket.onclose = () => {
+                console.log('[WebRTC] Signaling connection closed');
+                if (dataChannel && dataChannel.readyState === 'open') {
+                    // Don't cleanup immediately, WebRTC might still work
+                    updateStatus('Signaling disconnected, WebRTC may still work', 'waiting');
+                } else {
+                    cleanup();
+                    updateStatus('Disconnected', 'waiting');
+                    document.getElementById('connectBtn').disabled = false;
+                    document.getElementById('disconnectBtn').disabled = true;
+                }
+            };
+
+            signalingSocket.onerror = (error) => {
+                console.error('[WebRTC] Signaling error:', error);
+                updateStatus('Signaling error: ' + error.message, 'error');
+            };
+        }
+
+        function cleanup() {
+            console.log('[WebRTC] Cleaning up connections');
+
+            if (dataChannel) {
+                dataChannel.close();
+                dataChannel = null;
+            }
+
+            if (peerConnection) {
+                peerConnection.close();
+                peerConnection = null;
+            }
+
+            if (signalingSocket) {
+                signalingSocket.close();
+                signalingSocket = null;
+            }
+
+            // Notify NetBridge of disconnection
+            if (window.NetBridge_onClose) {
+                window.NetBridge_onClose();
+            }
+        }
+
+        // Event listeners
+        document.getElementById('connectBtn').addEventListener('click', () => {
+            document.getElementById('connectBtn').disabled = true;
+            document.getElementById('disconnectBtn').disabled = false;
+            updateStatus('Connecting to signaling server...', 'waiting');
+            connectToProxy('localhost', 8766);
+        });
+
+        document.getElementById('disconnectBtn').addEventListener('click', () => {
+            cleanup();
+            updateStatus('Disconnected', 'waiting');
+            document.getElementById('connectBtn').disabled = false;
+            document.getElementById('disconnectBtn').disabled = true;
+        });
+
+        // Initialize
+        updateStatus('Waiting for connection...', 'waiting');
+    </script>
+</body>
+</html>

@@ -1,0 +1,354 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>poc</groupId>
+  <artifactId>mc-browser</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+  <packaging>jar</packaging>
+
+  <properties>
+    <maven.compiler.release>21</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <teavm.version>0.13.1</teavm.version>
+  </properties>
+
+  <dependencies>
+    <!-- Patched Minecraft (after Patcher3 and stubbing) -->
+    <dependency>
+      <groupId>poc</groupId>
+      <artifactId>mc-named</artifactId>
+      <version>1.21.1</version>
+      <scope>system</scope>
+      <systemPath>${project.basedir}/build/mc-patched-stubbed.jar</systemPath>
+    </dependency>
+    <!-- Compat stubs -->
+    <dependency>
+      <groupId>poc</groupId>
+      <artifactId>compat-stubs</artifactId>
+      <version>1.0</version>
+      <scope>system</scope>
+      <systemPath>${project.basedir}/build/compat-stubs.jar</systemPath>
+    </dependency>
+    <!-- Netty compile deps for MinecraftClientConnection -->
+    <dependency>
+      <groupId>mc.io.lib</groupId>
+      <artifactId>netty-buffer</artifactId>
+      <version>4.1.97.Final</version>
+      <scope>system</scope>
+      <systemPath>${project.basedir}/input/libs/io/netty/netty-buffer/4.1.97.Final/netty-buffer-4.1.97.Final.jar</systemPath>
+    </dependency>
+    <dependency>
+      <groupId>mc.io.lib</groupId>
+      <artifactId>netty-codec</artifactId>
+      <version>4.1.97.Final</version>
+      <scope>system</scope>
+      <systemPath>${project.basedir}/input/libs/io/netty/netty-codec/4.1.97.Final/netty-codec-4.1.97.Final.jar</systemPath>
+    </dependency>
+    <dependency>
+      <groupId>mc.io.lib</groupId>
+      <artifactId>netty-common</artifactId>
+      <version>4.1.97.Final</version>
+      <scope>system</scope>
+      <systemPath>${project.basedir}/input/libs/io/netty/netty-common/4.1.97.Final/netty-common-4.1.97.Final.jar</systemPath>
+    </dependency>
+    <dependency>
+      <groupId>mc.io.lib</groupId>
+      <artifactId>netty-handler</artifactId>
+      <version>4.1.97.Final</version>
+      <scope>system</scope>
+      <systemPath>${project.basedir}/input/libs/io/netty/netty-handler/4.1.97.Final/netty-handler-4.1.97.Final.jar</systemPath>
+    </dependency>
+    <dependency>
+      <groupId>mc.io.lib</groupId>
+      <artifactId>netty-transport</artifactId>
+      <version>4.1.97.Final</version>
+      <scope>system</scope>
+      <systemPath>${project.basedir}/input/libs/io/netty/netty-transport/4.1.97.Final/netty-transport-4.1.97.Final.jar</systemPath>
+    </dependency>
+    <!-- Mojang libs for compile -->
+    <dependency>
+      <groupId>mc.lib</groupId>
+      <artifactId>brigadier</artifactId>
+      <version>1.3.10</version>
+      <scope>system</scope>
+      <systemPath>${project.basedir}/input/libs/com/mojang/brigadier/1.3.10/brigadier-1.3.10.jar</systemPath>
+    </dependency>
+    <!-- ASM for Patcher3 compilation/execution -->
+    <dependency>
+      <groupId>org.ow2.asm</groupId>
+      <artifactId>asm</artifactId>
+      <version>9.6</version>
+      <scope>system</scope>
+      <systemPath>${project.basedir}/tools/asm-9.6.jar</systemPath>
+    </dependency>
+    <dependency>
+      <groupId>org.ow2.asm</groupId>
+      <artifactId>asm-tree</artifactId>
+      <version>9.6</version>
+      <scope>system</scope>
+      <systemPath>/home/bilal/.m2/repository/org/ow2/asm/asm-tree/9.6/asm-tree-9.6.jar</systemPath>
+    </dependency>
+    <!-- TeaVM dependencies -->
+    <dependency>
+      <groupId>org.teavm</groupId>
+      <artifactId>teavm-core</artifactId>
+      <version>${teavm.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.teavm</groupId>
+      <artifactId>teavm-classlib</artifactId>
+      <version>${teavm.version}</version>
+      <scope>system</scope>
+      <systemPath>${project.basedir}/build/teavm-classlib-patched.jar</systemPath>
+    </dependency>
+    <dependency>
+      <groupId>org.teavm</groupId>
+      <artifactId>teavm-platform</artifactId>
+      <version>${teavm.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.teavm</groupId>
+      <artifactId>teavm-jso-apis</artifactId>
+      <version>${teavm.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.teavm</groupId>
+      <artifactId>teavm-jso</artifactId>
+      <version>${teavm.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.teavm</groupId>
+      <artifactId>teavm-jso-impl</artifactId>
+      <version>${teavm.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.teavm</groupId>
+      <artifactId>teavm-interop</artifactId>
+      <version>${teavm.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.teavm</groupId>
+      <artifactId>teavm-metaprogramming-api</artifactId>
+      <version>${teavm.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.teavm</groupId>
+      <artifactId>teavm-metaprogramming-impl</artifactId>
+      <version>${teavm.version}</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <!-- AntRun plugin to run Patcher3 and stub Mojang libraries -->
+      <plugin>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <version>3.1.0</version>
+        <executions>
+          <!-- Copy stubs (if any) -->
+          <execution>
+            <id>copy-stubs</id>
+            <phase>compile</phase>
+            <goals><goal>run</goal></goals>
+            <configuration>
+              <target>
+                <copy todir="${project.build.outputDirectory}">
+                  <fileset dir="${project.basedir}/build/stubs"/>
+                </copy>
+              </target>
+            </configuration>
+          </execution>
+          <!-- Patch the main Minecraft JAR (replace ClientConnection, strip Netty/log4j, stub Mojang classes) -->
+          <execution>
+            <id>patch-classes</id>
+            <phase>generate-sources</phase>
+            <goals><goal>run</goal></goals>
+            <configuration>
+              <target>
+                <java classname="poc.patch.Patcher3" fork="true">
+                  <classpath>
+                    <pathelement path="${project.basedir}/build/patcher-classes"/>
+                    <pathelement path="${project.basedir}/tools/asm-9.6.jar"/>
+                    <pathelement path="${project.basedir}/tools/asm-tree-9.6.jar"/>
+                    <pathelement path="${project.basedir}/build/mc-named.jar"/>
+                    <pathelement path="${project.basedir}/build/compat-stubs.jar"/>
+                    <fileset dir="${project.basedir}/input/libs">
+                      <include name="**/*.jar"/>
+                    </fileset>
+                    <pathelement path="${settings.localRepository}/org/teavm/teavm-core/${teavm.version}/teavm-core-${teavm.version}.jar"/>
+                    <pathelement path="${settings.localRepository}/org/teavm/teavm-jso/${teavm.version}/teavm-jso-${teavm.version}.jar"/>
+                    <pathelement path="${settings.localRepository}/org/ow2/asm/asm/9.6/asm-9.6.jar"/>
+                    <pathelement path="${settings.localRepository}/org/ow2/asm/asm-commons/9.6/asm-commons-9.6.jar"/>
+                    <pathelement path="${settings.localRepository}/org/ow2/asm/asm-tree/9.6/asm-tree-9.6.jar"/>
+                    <pathelement path="${settings.localRepository}/org/ow2/asm/asm-analysis/9.6/asm-analysis-9.6.jar"/>
+                  </classpath>
+                  <arg value="${project.basedir}/build/mc-named.jar"/>
+                  <arg value="${project.basedir}/build/mc-patched-stubbed.jar"/>
+                </java>
+              </target>
+            </configuration>
+          </execution>
+          <!-- Stub Mojang library JARs -->
+          <execution>
+            <id>stub-authlib</id>
+            <phase>generate-sources</phase>
+            <goals><goal>run</goal></goals>
+            <configuration>
+              <target>
+                <mkdir dir="${project.basedir}/build/mojang-stubbed"/>
+                <java classname="poc.patch.Patcher3" fork="true">
+                  <classpath>
+                    <pathelement path="${project.basedir}/build/patcher-classes"/>
+                    <pathelement path="${project.basedir}/tools/asm-9.6.jar"/>
+                  </classpath>
+                  <arg value="${project.basedir}/input/libs/com/mojang/authlib/6.0.54/authlib-6.0.54.jar"/>
+                  <arg value="${project.basedir}/build/mojang-stubbed/authlib-6.0.54-stubbed.jar"/>
+                </java>
+              </target>
+            </configuration>
+          </execution>
+          <execution>
+            <id>stub-blocklist</id>
+            <phase>generate-sources</phase>
+            <goals><goal>run</goal></goals>
+            <configuration>
+              <target>
+                <java classname="poc.patch.Patcher3" fork="true">
+                  <classpath>
+                    <pathelement path="${project.basedir}/build/patcher-classes"/>
+                    <pathelement path="${project.basedir}/tools/asm-9.6.jar"/>
+                  </classpath>
+                  <arg value="${project.basedir}/input/libs/com/mojang/blocklist/1.0.10/blocklist-1.0.10.jar"/>
+                  <arg value="${project.basedir}/build/mojang-stubbed/blocklist-1.0.10-stubbed.jar"/>
+                </java>
+              </target>
+            </configuration>
+          </execution>
+          <execution>
+            <id>stub-brigadier</id>
+            <phase>generate-sources</phase>
+            <goals><goal>run</goal></goals>
+            <configuration>
+              <target>
+                <java classname="poc.patch.Patcher3" fork="true">
+                  <classpath>
+                    <pathelement path="${project.basedir}/build/patcher-classes"/>
+                    <pathelement path="${project.basedir}/tools/asm-9.6.jar"/>
+                  </classpath>
+                  <arg value="${project.basedir}/input/libs/com/mojang/brigadier/1.3.10/brigadier-1.3.10.jar"/>
+                  <arg value="${project.basedir}/build/mojang-stubbed/brigadier-1.3.10-stubbed.jar"/>
+                </java>
+              </target>
+            </configuration>
+          </execution>
+          <execution>
+            <id>stub-datafixerupper</id>
+            <phase>generate-sources</phase>
+            <goals><goal>run</goal></goals>
+            <configuration>
+              <target>
+                <java classname="poc.patch.Patcher3" fork="true">
+                  <classpath>
+                    <pathelement path="${project.basedir}/build/patcher-classes"/>
+                    <pathelement path="${project.basedir}/tools/asm-9.6.jar"/>
+                  </classpath>
+                  <arg value="${project.basedir}/input/libs/com/mojang/datafixerupper/8.0.16/datafixerupper-8.0.16.jar"/>
+                  <arg value="${project.basedir}/build/mojang-stubbed/datafixerupper-8.0.16-stubbed.jar"/>
+                </java>
+              </target>
+            </configuration>
+          </execution>
+          <execution>
+            <id>stub-logging</id>
+            <phase>generate-sources</phase>
+            <goals><goal>run</goal></goals>
+            <configuration>
+              <target>
+                <java classname="poc.patch.Patcher3" fork="true">
+                  <classpath>
+                    <pathelement path="${project.basedir}/build/patcher-classes"/>
+                    <pathelement path="${project.basedir}/tools/asm-9.6.jar"/>
+                  </classpath>
+                  <arg value="${project.basedir}/input/libs/com/mojang/logging/1.2.7/logging-1.2.7.jar"/>
+                  <arg value="${project.basedir}/build/mojang-stubbed/logging-1.2.7-stubbed.jar"/>
+                </java>
+              </target>
+            </configuration>
+          </execution>
+          <execution>
+            <id>stub-patchy</id>
+            <phase>generate-sources</phase>
+            <goals><goal>run</goal></goals>
+            <configuration>
+              <target>
+                <java classname="poc.patch.Patcher3" fork="true">
+                  <classpath>
+                    <pathelement path="${project.basedir}/build/patcher-classes"/>
+                    <pathelement path="${project.basedir}/tools/asm-9.6.jar"/>
+                  </classpath>
+                  <arg value="${project.basedir}/input/libs/com/mojang/patchy/2.2.10/patchy-2.2.10.jar"/>
+                  <arg value="${project.basedir}/build/mojang-stubbed/patchy-2.2.10-stubbed.jar"/>
+                </java>
+              </target>
+            </configuration>
+          </execution>
+          <execution>
+            <id>stub-text2speech</id>
+            <phase>generate-sources</phase>
+            <goals><goal>run</goal></goals>
+            <configuration>
+              <target>
+                <java classname="poc.patch.Patcher3" fork="true">
+                  <classpath>
+                    <pathelement path="${project.basedir}/build/patcher-classes"/>
+                    <pathelement path="${project.basedir}/tools/asm-9.6.jar"/>
+                  </classpath>
+                  <arg value="${project.basedir}/input/libs/com/mojang/text2speech/1.17.9/text2speech-1.17.9.jar"/>
+                  <arg value="${project.basedir}/build/mojang-stubbed/text2speech-1.17.9-stubbed.jar"/>
+                </java>
+              </target>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <!-- Compiler plugin -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.15.0</version>
+        <configuration>
+          <excludes>
+            <exclude>poc/compat/**</exclude>
+            <exclude>poc/stubgen/**</exclude>
+          </excludes>
+        </configuration>
+      </plugin>
+      <!-- TeaVM plugin -->
+      <plugin>
+        <groupId>org.teavm</groupId>
+        <artifactId>teavm-maven-plugin</artifactId>
+        <version>${teavm.version}</version>
+        <executions>
+          <execution>
+            <id>js</id>
+            <goals>
+              <goal>compile</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <targetType>JAVASCRIPT</targetType>
+          <mainClass>poc.ClientMain</mainClass>
+          <targetDirectory>${project.build.directory}/teavm-js</targetDirectory>
+          <minifying>false</minifying>
+          <optimizationLevel>SIMPLE</optimizationLevel>
+          <debugInformationGenerated>true</debugInformationGenerated>
+          <strict>false</strict>
+          <stopOnErrors>false</stopOnErrors>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>
