@@ -5,7 +5,7 @@ const devWs = new WebSocket('ws://localhost:9230/devtools/page/' + PAGE_ID);
 devWs.on('open', () => {
     devWs.send(JSON.stringify({id: 1, method: 'Runtime.enable'}));
     devWs.send(JSON.stringify({id: 2, method: 'Console.enable'}));
-    
+
     // Connect to proxy
     setTimeout(() => {
         devWs.send(JSON.stringify({
@@ -13,29 +13,29 @@ devWs.on('open', () => {
             params: { expression: 'connectToProxy("localhost", 8766, "127.0.0.1", 25620)', returnByValue: true }
         }));
     }, 2000);
-    
+
     // Check DataChannel state
     setTimeout(() => {
         devWs.send(JSON.stringify({
             id: 4, method: 'Runtime.evaluate',
             params: { expression: 'JSON.stringify({dc: window.dataChannel?.readyState || "none"})', returnByValue: true }
-        });
+        }));
     }, 10000);
-    
+
     // Check again later
     setTimeout(() => {
         devWs.send(JSON.stringify({
             id: 5, method: 'Runtime.evaluate',
             params: { expression: 'JSON.stringify({dc: window.dataChannel?.readyState || "none"})', returnByValue: true }
-        });
+        }));
     }, 15000);
-    
+
     // Check again later
     setTimeout(() => {
         devWs.send(JSON.stringify({
             id: 6, method: 'Runtime.evaluate',
             params: { expression: 'JSON.stringify({dc: window.dataChannel?.readyState || "none"})', returnByValue: true }
-        });
+        }));
     }, 20000);
 });
 

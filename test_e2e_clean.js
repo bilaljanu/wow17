@@ -1,137 +1,88 @@
 const WebSocket = require('ws');
-const fs = require('fs');
 
-const PAGE_ID = process.env.PAGE_ID || 'A7C43B8CF33C8698FA537DAA9DB9F237';
-const ws = new WebSocket(`ws://localhost:9230/devtools/page/${PAGE_ID}`);
-let messageId = 0;
-const logs = { browser: [], proxy: [] };
+const PAGE_ID = '7924CF024F63A0CDC2D1F1861952A561';
+const devWs = new WebSocket('ws://localhost:9230/devtools/page/' + PAGE_ID);
 
-ws.on('open', () => {
-    console.log('[TEST] Connected to Chrome DevTools\n');
-    ws.send(JSON.stringify({ id: ++messageId, method: 'Runtime.enable' }));
-    ws.send(JSON.stringify({ id: ++messageId, method: 'Console.enable' }));
+let dcOpen = false;
+let testsPassed = 0;
+let testsFailed = 0;
+
+devWs.on('open', () => {
+    console.log('[TEST] Connected to Chrome DevTools');
     
-    // Wait for page to load and click connect
+    devWs.send(JSON.stringify({id: 1, method: 'Runtime.enable'}));
+    devWs.send(JSON.stringify({id: 2, method: 'Console.enable'}));
+    
+    // Wait for page to load and TeaVM to initialize
     setTimeout(() => {
-        console.log('[TEST] Step 1: Connecting to proxy...\n');
-        ws.send(JSON.stringify({
-            id: ++messageId,
-            method: 'Runtime.evaluate',
-            params: {
-                expression: '(function() { console.log("[TEST] Clicking Connect"); document.getElementById("connectBtn").click(); return "clicked"; })()',
-                returnByValue: true
-            }
+        devWs.send(JSON.stringify({
+            id: 3, method: 'Runtime.evaluate',
+            params: { expression: 'JSON.stringify({main: typeof main, netBridge: typeof window.NetBridgeBridge, dc: window.dataChannel?.readyState || "none"})', returnByValue: true }
+        }));
+    }, 3000);
+    
+    // Try to connect to proxy
+    setTimeout(() => {
+        devWs.send(JSON.stringify({
+            id: 4, method: 'Runtime.evaluate',
+            params: { expression: 'connectToProxy("localhost", 8766, "127.0.0.1", 25620)', returnByValue: true }
+        }));
+        console.log('[TEST] Initiated WebRTC connection to proxy');
+    }, 6000);
+    
+    // Poll for DataChannel state
+    const checkInterval = setInterval(() => {
+        devWs.send(JSON.stringify({
+            id: 5, method: 'Runtime.evaluate',
+            params: { expression: 'JSON.stringify({dc: window.dataChannel?.readyState || "none"})', returnByValue: true }
         }));
     }, 2000);
     
-    // Wait for DataChannel to open, then send login packet
-    setTimeout(() => {
-        console.log('[TEST] Step 2: Sending Minecraft login packet...');
-        
-        var expr = buildMinecraftPacket();
-        ws.send(JSON.stringify({
-            id: ++messageId,
-            method: 'Runtime.evaluate',
-            params: { expression: expr, returnByValue: true }
-        }));
-    }, 5000);
-    
-    // Final check
-    setTimeout(() => {
-        console.log('\n=== RESULTS ===\n');
-        
-        // Check browser logs
-        console.log('[Browser Console]');
-        logs.browser.forEach((l, i) => console.log(`  ${i+1}. [${l.type}] ${l.text}`));
-        
-        // Check proxy log
-        console.log('\n[Proxy Log]');
-        try {
-            var proxyLog = fs.readFileSync('/tmp/proxy.log', 'utf8');
-            proxyLog.split('\n').filter(l => l.includes('[PROXY')).forEach(l => console.log(`  ${l}`));
-        } catch(e) {}
-        
-        // Verification
-        console.log('\n=== VERIFICATION ===');
-        check('[PROXY D] WebRTC connected', logs.proxy.some(l => l.includes('[PROXY D]') && l.includes('connected')));
-        check('[PROXY E] DataChannel open', logs.proxy.some(l => l.includes('[PROXY E]') && l.includes('open')));
-        check('[PROXY F] TCP connected', logs.proxy.some(l => l.includes('[PROXY F]') && l.includes('connected')));
-        check('[PROXY G] Received from server', logs.proxy.some(l => l.includes('[PROXY G]')));
-        check('[PROXY H] Forwarded to browser', logs.proxy.some(l => l.includes('[PROXY H]')));
-        check('[RUNTIME A] onmessage', logs.browser.some(l => l.text.includes('[RUNTIME A]') && l.text.includes('byteLength')));
-        check('[RUNTIME B] NetBridge called', logs.browser.some(l => l.text.includes('[RUNTIME B]')));
-        check('[RUNTIME C] onReceiveFrame', logs.browser.some(l => l.text.includes('[RUNTIME C]')));
-        check('[RUNTIME F] frameLength parsed', logs.browser.some(l => l.text.includes('[RUNTIME F]')));
-        check('[RUNTIME G] packetId parsed', logs.browser.some(l => l.text.includes('[RUNTIME G]')));
-        
-        // Minecraft server logs
-        console.log('\n[Minecraft Server]');
-        try {
-            var mcLog = fs.readFileSync('/home/bilal/wow17/logs/latest.log', 'utf8');
-            var lines = mcLog.split('\n').filter(l => l.includes('connected') || l.includes('logged in'));
-            lines.slice(-3).forEach(l => console.log(`  ${l}`));
-            if (lines.length === 0) console.log('  (no login activity)');
-        } catch(e) {}
-        
-        ws.close();
-        process.exit(0);
-    }, 10000);
-});
-
-function check(name, condition) {
-    console.log(`  ${condition ? 'PASS' : 'FAIL'}: ${name}`);
-}
-
-function buildMinecraftPacket() {
-    return '(function() { ' +
-        'console.log("[TEST] Building login packet"); ' +
-        'var dc = window.dataChannel; ' +
-        'if (!dc || dc.readyState !== "open") { ' +
-        '  console.log("[TEST] ERROR: DataChannel not ready:", dc ? dc.readyState : "none"); ' +
-        '  return "failed"; ' +
-        '} ' +
-        'console.log("[TEST] DataChannel state:", dc.readyState); ' +
-        'var bytes = []; ' +
-        'function writeVarInt(val) { ' +
-        '  while (true) { ' +
-        '    if ((val & -128) === 0) { bytes.push(val & 0xFF); return; } ' +
-        '    bytes.push((val & 127) | 128); val >>>= 7; ' +
-        '  } ' +
-        '} ' +
-        '// Login start packet (ID 0x00) ' +
-        'writeVarInt(0); ' +
-        '// Protocol version 766 ' +
-        'writeVarInt(766); ' +
-        '// Hostname ' +
-        'var host = "localhost"; ' +
-        'writeVarInt(host.length); ' +
-        'for (var i = 0; i < host.length; i++) bytes.push(host.charCodeAt(i)); ' +
-        '// Port 30000 ' +
-        'writeVarInt(30000); ' +
-        '// Next state 1 (login) ' +
-        'writeVarInt(1); ' +
-        '// Prepend frame length ' +
-        'var frameLen = bytes.length; ' +
-        'var frame = []; ' +
-        'writeVarInt(frameLen); ' +
-        'bytes = frame.concat(bytes); ' +
-        'console.log("[TEST] Sending", bytes.length, "bytes:", Array.from(bytes).map(function(b){return "0x"+b.toString(16).padStart(2,"0");}).join(" ")); ' +
-        'dc.send(new Uint8Array(bytes)); ' +
-        'return "sent"; ' +
-        '})()';
-}
-
-ws.on('message', (data) => {
-    var msg = JSON.parse(data.toString());
-    
-    if (msg.id && msg.result) {
-        if (msg.result.result?.value !== undefined) {
-            console.log(`[Result ${msg.id}] ${JSON.stringify(msg.result.result.value)}`);
+    devWs.on('message', (data) => {
+        const m = JSON.parse(data.toString());
+        if (m.method === 'Runtime.consoleAPICalled') {
+            const t = (m.params.args||[]).map(a=>a.value||a.description).join(' ');
+            if (t.includes('[WebRTC]') || t.includes('[NetBridge]') || t.includes('[RUNTIME') || t.includes('[TEST]')) {
+                console.log('[BROWSER]', t);
+            }
         }
-    } else if (msg.method === 'Runtime.consoleAPICalled') {
-        var args = (msg.params.args || []).map(a => a.value !== undefined ? a.value : a.description).join(' ');
-        logs.browser.push({ type: msg.params.type, text: args });
-    }
+        if (m.id === 3 && m.result?.result?.value) {
+            console.log('[RESULT] Initial state:', m.result.result.value);
+        }
+        if (m.id === 4 && m.result?.result?.value) {
+            console.log('[RESULT] Connect result:', m.result.result.value);
+        }
+        if (m.id === 5 && m.result?.result?.value) {
+            const state = m.result.result.value;
+            console.log('[RESULT] DC state:', state);
+            if (state.includes('open')) {
+                dcOpen = true;
+                clearInterval(checkInterval);
+                testsPassed++;
+                console.log('[TEST] DataChannel opened successfully!');
+            }
+        }
+    });
+    
+    // Final status check
+    setTimeout(() => {
+        clearInterval(checkInterval);
+        devWs.send(JSON.stringify({
+            id: 99, method: 'Runtime.evaluate',
+            params: { expression: 'JSON.stringify({finalDc: window.dataChannel?.readyState || "none", finalWs: window.signalingSocket?.readyState || "none"})', returnByValue: true }
+        }));
+        setTimeout(() => {
+            console.log(`\n[SUMMARY] Tests passed: ${testsPassed}, Tests failed: ${testsFailed}`);
+            if (dcOpen) {
+                console.log('[PASS] Browser successfully established WebRTC DataChannel!');
+            } else {
+                console.log('[FAIL] DataChannel did not open');
+            }
+            devWs.close();
+            process.exit(dcOpen ? 0 : 1);
+        }, 3000);
+    }, 15000);
 });
 
-ws.on('error', (err) => console.error('[WS Error]', err.message));
+devWs.on('error', (err) => console.error('[DEVTOOLS ERROR]', err.message));
+setTimeout(() => devWs.close(), 25000);

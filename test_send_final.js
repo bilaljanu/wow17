@@ -51,7 +51,7 @@ const devWs = new WebSocket('ws://localhost:9230/devtools/page/' + PAGE_ID);
 devWs.on('open', () => {
     devWs.send(JSON.stringify({id: 1, method: 'Runtime.enable'}));
     devWs.send(JSON.stringify({id: 2, method: 'Console.enable'}));
-    
+
     // Connect to proxy
     setTimeout(() => {
         devWs.send(JSON.stringify({
@@ -59,15 +59,15 @@ devWs.on('open', () => {
             params: { expression: 'connectToProxy("localhost", 8766, "127.0.0.1", 25620)', returnByValue: true }
         }));
     }, 2000);
-    
+
     // Wait for DataChannel
     setTimeout(() => {
         devWs.send(JSON.stringify({
             id: 4, method: 'Runtime.evaluate',
             params: { expression: 'JSON.stringify({dc: window.dataChannel?.readyState || "none"})', returnByValue: true }
-        });
+        }));
     }, 10000);
-    
+
     // Send handshake at 15s
     setTimeout(() => {
         const expr = '(function() { ' +

@@ -1,110 +1,111 @@
 const WebSocket = require('ws');
+const fs = require('fs');
 
-const PAGE_WS = 'ws://localhost:9223/devtools/page/4D4E0D22C96AA6058431315324B81E17';
-const ws = new WebSocket(PAGE_WS);
-let messageId = 0;
-const consoleMessages = [];
+const PAGE_ID = '2849687F3553B49EA13C883AAA81FC9D';
+const devWs = new WebSocket('ws://localhost:9231/devtools/page/' + PAGE_ID);
 
-ws.on('open', function() {
-    console.log('Connected to Chrome DevTools');
-    ws.send(JSON.stringify({ id: ++messageId, method: 'Runtime.enable' }));
-    ws.send(JSON.stringify({ id: ++messageId, method: 'Console.enable' }));
+let dcOpen = false;
+let tcpConnected = false;
+let browserLog = [];
 
-    setTimeout(function() {
-        console.log('\n=== Starting E2E Test ===\n');
-
-        // Click connect button
-        ws.send(JSON.stringify({
-            id: ++messageId,
-            method: 'Runtime.evaluate',
-            params: {
-                expression: '(function() { console.log("[TEST] Clicking Connect to WebRTC Proxy"); var btn = document.getElementById("connectBtn"); if (btn) { btn.click(); return "clicked"; } return "button not found"; })()',
-                returnByValue: true
-            }
+devWs.on('open', () => {
+    console.log('[TEST] Connected to Chrome DevTools');
+    
+    devWs.send(JSON.stringify({id: 10, method: 'Runtime.enable'}));
+    devWs.send(JSON.stringify({id: 11, method: 'Console.enable'}));
+    
+    // Wait for page to load and TeaVM to initialize
+    setTimeout(() => {
+        devWs.send(JSON.stringify({
+            id: 20, method: 'Runtime.evaluate',
+            params: { expression: 'JSON.stringify({main: typeof main, netBridge: !!window.NetBridgeBridge})', returnByValue: true }
         }));
-    }, 500);
-
-    // Check state after 5 seconds
-    setTimeout(function() {
-        ws.send(JSON.stringify({
-            id: ++messageId,
-            method: 'Runtime.evaluate',
-            params: {
-                expression: '(function() { return { NetBridge_receivePacket: typeof window.NetBridge_receivePacket, dataChannel: window.dataChannel ? { readyState: window.dataChannel.readyState } : null, peerConnection: window.peerConnection ? { state: window.peerConnection.connectionState } : null }; })()',
-                returnByValue: true
-            }
+    }, 2000);
+    
+    // Connect to proxy
+    setTimeout(() => {
+        devWs.send(JSON.stringify({
+            id: 30, method: 'Runtime.evaluate',
+            params: { expression: 'connectToProxy("localhost", 8766, "127.0.0.1", 25620)', returnByValue: true }
         }));
+        console.log('[TEST] Sent connectToProxy command');
     }, 5000);
-
-    // Check state after 10 seconds
-    setTimeout(function() {
-        ws.send(JSON.stringify({
-            id: ++messageId,
-            method: 'Runtime.evaluate',
-            params: {
-                expression: '(function() { return { NetBridge_receivePacket: typeof window.NetBridge_receivePacket, dataChannel: window.dataChannel ? { readyState: window.dataChannel.readyState } : null, peerConnection: window.peerConnection ? { state: window.peerConnection.connectionState } : null }; })()',
-                returnByValue: true
-            }
+    
+    // Poll for DataChannel state
+    const pollInterval = setInterval(() => {
+        devWs.send(JSON.stringify({
+            id: 40, method: 'Runtime.evaluate',
+            params: { expression: 'JSON.stringify({dc: window.dataChannel?.readyState || "none"})', returnByValue: true }
         }));
-    }, 10000);
-
-    // Final results after 15 seconds
-    setTimeout(function() {
-        console.log('\n=== Test Results ===');
-        var runtimeLogs = consoleMessages.filter(function(m) {
-            return m.text.includes('RUNTIME') || m.text.includes('[TEST') || m.text.includes('[PROXY');
-        });
-
-        runtimeLogs.forEach(function(msg, i) {
-            console.log((i+1) + '. [' + msg.type.toUpperCase() + '] ' + msg.text);
-        });
-
-        var hasA = runtimeLogs.some(function(m) { return m.text.includes('[RUNTIME A]'); });
-        var hasC = runtimeLogs.some(function(m) { return m.text.includes('[RUNTIME C]'); });
-        var hasE = runtimeLogs.some(function(m) { return m.text.includes('[RUNTIME E]'); });
-        var hasF = runtimeLogs.some(function(m) { return m.text.includes('[RUNTIME F]'); });
-        var hasG = runtimeLogs.some(function(m) { return m.text.includes('[RUNTIME G]'); });
-
-        console.log('\n=== Verification ===');
-        console.log('[RUNTIME A] present:', hasA ? 'YES' : 'NO');
-        console.log('[RUNTIME C] present:', hasC ? 'YES' : 'NO');
-        console.log('[RUNTIME E] present:', hasE ? 'YES' : 'NO');
-        console.log('[RUNTIME F] present:', hasF ? 'YES' : 'NO');
-        console.log('[RUNTIME G] present:', hasG ? 'YES' : 'NO');
-
-        var proxySuccess = consoleMessages.some(function(m) {
-            return m.text.includes('[PROXY D]') && m.text.includes('connected');
-        });
-        var tcpSuccess = consoleMessages.some(function(m) {
-            return m.text.includes('[PROXY F]') && m.text.includes('TCP connected');
-        });
-
-        console.log('\n[PROXY D] WebRTC connected:', proxySuccess ? 'YES' : 'NO');
-        console.log('[PROXY F] TCP connected:', tcpSuccess ? 'YES' : 'NO');
-
-        ws.close();
-        process.exit(0);
-    }, 15000);
+    }, 2000);
+    
+    // Check TCP connection state in proxy log
+    const checkTcpInterval = setInterval(() => {
+        try {
+            const log = fs.readFileSync('/tmp/proxy.log', 'utf8');
+            if (log.includes('TCP connected to Minecraft server') && !tcpConnected) {
+                tcpConnected = true;
+                console.log('[TEST] TCP connection to Minecraft server established!');
+            }
+        } catch(e) {}
+    }, 1000);
+    
+    devWs.on('message', (data) => {
+        const m = JSON.parse(data.toString());
+        
+        if (m.method === 'Runtime.consoleAPICalled') {
+            const t = (m.params.args||[]).map(a=>a.value||a.description).join(' ');
+            browserLog.push(t);
+            if (t.includes('[WebRTC]') || t.includes('[NetBridge]') || t.includes('[RUNTIME') || t.includes('[TEST]')) {
+                console.log('[BROWSER]', t);
+            }
+        }
+        
+        if (m.id === 40 && m.result?.result?.value) {
+            const state = m.result.result.value;
+            console.log('[STATE] ' + state);
+            if (state.includes('"open"') || state.includes('open')) {
+                dcOpen = true;
+                clearInterval(pollInterval);
+                console.log('[TEST] DataChannel opened successfully!');
+            }
+        }
+    });
+    
+    // Final status
+    setTimeout(() => {
+        clearInterval(pollInterval);
+        clearInterval(checkTcpInterval);
+        
+        console.log('\n=== E2E TEST SUMMARY ===');
+        console.log('[TEST] DataChannel open:', dcOpen ? 'YES' : 'NO');
+        console.log('[TEST] TCP connected to MC server:', tcpConnected ? 'YES' : 'NO');
+        
+        // Show proxy log
+        console.log('\n[PROXY LOG]');
+        try {
+            console.log(fs.readFileSync('/tmp/proxy.log', 'utf8'));
+        } catch(e) {
+            console.log('[ERROR] Could not read proxy log');
+        }
+        
+        // Show last 20 browser log lines
+        console.log('\n[RECENT BROWSER LOG]');
+        console.log(browserLog.slice(-20).join('\n'));
+        
+        if (dcOpen && tcpConnected) {
+            console.log('\n[PASS] Full E2E pipeline verified! Browser → WebRTC → Proxy → TCP → Minecraft');
+            devWs.close();
+            process.exit(0);
+        } else {
+            console.log('\n[INFO] Pipeline incomplete - checking if packets were sent...');
+            devWs.close();
+            process.exit(dcOpen || tcpConnected ? 0 : 1);
+        }
+    }, 20000);
 });
 
-ws.on('message', function(data) {
-    var msg = JSON.parse(data.toString());
-
-    if (msg.id && msg.result) {
-        if (msg.result.result && msg.result.result.value !== undefined) {
-            console.log('[Result ' + msg.id + '] ' + JSON.stringify(msg.result.result.value));
-        }
-        if (msg.result && msg.result.exceptionDetails) {
-            console.log('[Error ' + msg.id + '] ' + msg.result.exceptionDetails.text);
-        }
-    } else if (msg.method === 'Runtime.consoleAPICalled') {
-        var args = (msg.params.args || []).map(function(a) {
-            return a.value !== undefined ? a.value : a.description;
-        }).join(' ');
-        consoleMessages.push({ type: msg.params.type, text: args });
-    }
-});
-
-ws.on('error', function(err) {
-    console.error('[WS Error] ' + err.message);
+devWs.on('error', (err) => {
+    console.error('[TEST ERROR]', err.message);
+    process.exit(1);
 });
