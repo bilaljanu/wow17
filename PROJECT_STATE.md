@@ -1,5 +1,5 @@
-# Project State - E2E Pipeline Verification
-## Updated: 2026-09-12
+# Project State - E2E Pipeline Verification (Updated)
+## Updated: 2026-09-14
 
 ## What Is GENUINELY VERIFIED ✅
 
@@ -12,56 +12,65 @@ The complete browser → WebRTC → proxy → TCP → Minecraft server pipeline 
 [11:57:33] [Server thread/INFO]: TestPlayer joined the game
 ```
 
-This proves a fresh connection through the full WebRTC pipeline — not a stale log citation.
-
 ### Verified Components
 | Component | Status | Evidence |
 |-----------|--------|----------|
 | WebRTC offer/answer/ICE negotiation | ✅ | SDP exchange completed, state "connected" |
-| DataChannel opened (client & proxy) | ✅ | `[CLIENT] DataChannel OPENED!`, `[PROXY] DataChannel OPENED!` |
-| TCP connection to Minecraft server | ✅ | `[PROXY] TCP connected to Minecraft server!` |
-| Login packet sent via DataChannel → TCP | ✅ | `[PROXY] DataChannel received 17 bytes... Forwarded to TCP` |
-| Server processed Minecraft protocol | ✅ | Server assigned entity ID 37, logged spawn position |
-| Real server response received | ✅ | Server log shows entity ID 37 (new, distinct from ID 31, 32) |
+| DataChannel opened (client & proxy) | ✅ | `[PROXY E] DataChannel OPEN` |
+| TCP connection to Minecraft server | ✅ | `[PROXY F] TCP connected to Minecraft server on port 25620` |
+| Java packet send path implemented | ✅ | `initiateHandshake()` added to `MinecraftClientConnection.java` |
+| `NetBridge.joinServer()` calls `initiateHandshake()` | ✅ | Code verified |
 
-### Test Configuration
-- **Client**: Node.js script with `wrtc` library (proves architecture works)
-- **Proxy**: Port 8767 (standalone test proxy)
-- **Server**: Sandbox Minecraft on port 25620
-- **Result**: Entity ID 37 logged at 11:57:33
+### Java Code Changes (Committed)
+1. **MinecraftClientConnection.java**: Added `public void initiateHandshake(String hostname, int port)` using reflection to create `HandshakeC2SPacket(767, hostname, port, ConnectionIntent.LOGIN)` and send it
+2. **NetBridge.java**: Added `getConnection()` getter; modified `joinServer()` to call `connection.initiateHandshake(host, port)`
+3. **JsNetBridge.java**: Added `initiateConnection()` method for browser-facing use
+
+### Proxy Status
+- Port 8766 listening and operational
+- TCP to Minecraft server (port 25620) successfully established during tests
 
 ## What Is NOT YET VERIFIED ❌ (Browser Integration)
 
 ### Browser Integration Status
-- ✅ Browser can establish WebRTC connection to proxy (WebRTC state: connected)
-- ✅ Browser DataChannel opens (DataChannel opened)
-- ❌ Browser fails to send data through DataChannel due to JavaScript error
-- Error: "Cannot set properties of null (setting 'onopen')" in browser's JavaScript
-- This suggests the browser's JavaScript has a bug when trying to use the DataChannel to send data
+- ✅ Browser can establish WebRTC connection to proxy
+- ✅ DataChannel opens briefly
+- ❌ **DataChannel immediately closes** after opening - preventing packet transmission
+- ❌ Minecraft server receives NO new login during test session (last login: entity id 37 at 11:57:33)
 
 ### Root Cause Analysis
-The browser tests show:
-1. WebRTC negotiation completes successfully (ICE candidates exchanged)
-2. DataChannel opens briefly 
-3. DataChannel closes immediately when attempting to send data
-4. Error occurs in browser's JavaScript when DataChannel tries to send data
-5. Proxy receives NO WebSocket connection from browser (proxy log empty)
+The browser's `test.html` has a **JavaScript stability bug**:
+1. When DataChannel opens, the `onopen` handler does NOT prevent reconnection
+2. The `onclose` handler triggers `cleanup()` which closes the signaling WebSocket
+3. This causes the browser to immediately attempt reconnection
+4. The cycle repeats: connect → open → close → reconnect → open → close...
+5. This prevents any packet from being reliably transmitted
 
-This indicates the browser-side JavaScript has a bug in its DataChannel messaging logic, not a fundamental WebRTC or proxy issue.
+### Evidence from Test Logs
+```
+[BROWSER] DataChannel opened
+[BROWSER] DataChannel closed
+[BROWSER] Cleaning up connections
+[BROWSER] Connecting to signaling server at localhost 8766
+... (cycle repeats)
+```
+
+### Java Side Status
+- `attemptJoin()` IS called successfully: `[WebRTC] joinServer called with 127.0.0.1 25620`
+- `connectToMinecraftServer()` IS called: `[WebRTC] DataChannel is open - Java NetBridge will send Minecraft protocol packets`
+- However, the Java code path to send the HandshakeC2SPacket has NOT been verified because the DataChannel instability prevents the actual packet send
 
 ## Files
 - `/home/bilal/wow17/server/proxy_fixed.js` — Proxy (configured for port 25620)
 - `/home/bilal/wow17/test-server/` — Sandbox Minecraft server
-- `/home/bilal/wow17/target/teavm-js/test.html` — Browser test page (has JavaScript bug preventing data transmission)
-- `/home/bilal/wow17/src/main/java/poc/networking/JsNetBridge.java` — JS/TeaVM bridge
+- `/home/bilal/wow17/target/teavm-js/test.html` — Browser test page (has JavaScript bug preventing stable data transmission)
+- `/home/bilal/wow17/src/main/java/net/minecraft/network/MinecraftClientConnection.java` — Added `initiateHandshake()`
+- `/home/bilal/wow17/src/main/java/poc/networking/NetBridge.java` — Modified `joinServer()` to call `initiateHandshake()`
+- `/home/bilal/wow17/src/main/java/poc/networking/JsNetBridge.java` — Added `initiateConnection()`
 
 ## Next Steps Priority
 
-1. **Fix browser JavaScript bug** — Fix the "Cannot set properties of null" error in test.html that prevents data transmission
-2. **Re-run E2E with Chrome** — Verify browser → WebRTC → proxy → TCP → Minecraft works
-3. **Phase 3: Rendering** — WebGL2 / Three.js rendering pipeline (unverified)
-4. **Phase 4: Game Features** — Chunk loading, player movement, blocks, etc.
-
----
-
-**Milestone Achieved**: The core networking architecture (browser → WebRTC → proxy → TCP → real Minecraft server) is **genuinely proven** with distinguishable evidence (new entity ID, new timestamp). The browser-specific integration needs one more JavaScript fix before it can claim the same verification.
+1. **Fix browser JavaScript DataChannel stability bug** — The `onopen` handler should NOT trigger cleanup/reconnect cycles. Need to add a flag to prevent repeated cleanup on DataChannel close when it's intentionally closed by the user.
+2. **Re-run E2E with Chrome** — Verify browser → WebRTC → proxy → TCP → Minecraft works with stable connection
+3. **Verify packet transmission** — Confirm HandshakeC2SPacket is sent and received by server
+4. **Confirm new entity ID assignment** — Server should assign new entity ID for successful login
