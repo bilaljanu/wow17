@@ -1,5 +1,5 @@
 # Project State - E2E Pipeline Verification (Updated)
-## Updated: 2026-09-14 23:50
+## Updated: 2026-09-15 00:17
 
 ## What Is GENUINELY VERIFIED ✅
 
@@ -21,7 +21,7 @@ The complete browser → WebRTC → proxy → TCP → Minecraft server pipeline 
 | Java code for packet sending | ✅ | `initiateHandshake()` implemented, compiles successfully |
 | `NetBridge.joinServer()` calls `initiateHandshake()` | ✅ | Code verified at NetBridge.java:194 |
 
-### Java Code Changes (Committed in 8ead7e8)
+### Java Code Changes (Committed)
 1. **MinecraftClientConnection.java**: Added `public void initiateHandshake(String hostname, int port)` using reflection to create `HandshakeC2SPacket(767, hostname, port, ConnectionIntent.LOGIN)` and send it
 2. **NetBridge.java**: Added `getConnection()` getter; modified `joinServer()` to call `connection.initiateHandshake(host, port)`
 3. **JsNetBridge.java**: Added `initiateConnection()` method for browser-facing use
@@ -46,38 +46,59 @@ The browser's `test.html` has a **JavaScript stability bug**:
 4. The cycle repeats: connect → open → close → reconnect → open → close...
 5. This prevents any packet from being reliably transmitted
 
-### Evidence from Test Logs
+### TeaVM JS Compilation Issue — CRITICAL
+**Status**: TEAVM BUILD FAILS with pre-existing NPE
+
 ```
-[BROWSER] DataChannel opened
-[BROWSER] DataChannel closed
-[BROWSER] Cleaning up connections
-[BROWSER] Connecting to signaling server at localhost 8766
-... (cycle repeats)
+[ERROR] BUILD FAILURE
+Caused by: java.lang.NullPointerException: Cannot invoke "org.teavm.model.Variable.getIndex()"
+         because "variable" is null
+         at org.teavm.classlib.impl.lambda.LambdaMetafactorySubstitutor.substitute
 ```
 
-### Java Side Status
-- `attemptJoin()` IS called successfully: `[WebRTC] joinServer called with 127.0.0.1 25620`
-- `connectToMinecraftServer()` IS called: `[WebRTC] DataChannel is open - Java NetBridge will send Minecraft protocol packets`
-- However, the Java code path to send the HandshakeC2SPacket has NOT been verified because the DataChannel instability prevents the actual packet send
+**Verification**: Confirmed this is a PRE-EXISTING bug:
+- Tested with `git stash` (removing all changes) → TEAVM STILL FAILS
+- The error occurs in the TeaVM 0.13.1 compiler's LambdaMetafactorySubstitutor
+- It is triggered by lambda usage in the Minecraft codebase
 
-### TeaVM JS Compilation Issue
-- TeaVM JS compilation fails with pre-existing NPE in `LambdaMetafactorySubstitutor`
-- This is a TeaVM 0.13.1 bug triggered by lambda usage in `MinecraftClientConnection.send()`
-- The `classes.js` currently deployed was built before the latest Java changes
-- Need to resolve TeaVM compilation or find workaround
+**Impact**:
+- The current `target/teavm-js/classes.js` was built BEFORE the latest Java changes
+- It does NOT contain `initiateHandshake()`
+- Cannot rebuild until TeaVM bug is fixed or workarounded
+
+### Current State Summary
+| Claim | Status | Evidence |
+|-------|--------|----------|
+| WebRTC transport works | ✅ VERIFIED | SDP exchange completes, ICE connected |
+| Proxy → TCP to sandbox works | ✅ VERIFIED | TCP connection established to port 25620 |
+| Java packet-send code exists | ✅ VERIFIED | Source code present, Java compilation succeeds |
+| Browser calls joinServer() | ✅ VERIFIED | Console logs show `joinServer called` |
+| **TeaVM JS build works** | ❌ FAILS | NPE in LambdaMetafactorySubstitutor |
+| **Fresh classes.js with new code** | ❌ NOT AVAILABLE | classes.js is stale |
+| **HandshakeC2SPacket sent** | ❌ UNVERIFIED | Stale JS cannot run new code |
+| **Server receives login** | ❌ UNVERIFIED | No new login since historical entity 37 |
 
 ## Files
 - `/home/bilal/wow17/server/proxy_fixed.js` — Proxy (configured for port 25620)
 - `/home/bilal/wow17/test-server/` — Sandbox Minecraft server
-- `/home/bilal/wow17/target/teavm-js/test.html` — Browser test page (has JavaScript bug preventing stable data transmission)
+- `/home/bilal/wow17/target/teavm-js/test.html` — Browser test page
 - `/home/bilal/wow17/src/main/java/net/minecraft/network/MinecraftClientConnection.java` — Added `initiateHandshake()`
 - `/home/bilal/wow17/src/main/java/poc/networking/NetBridge.java` — Modified `joinServer()` to call `initiateHandshake()`
 - `/home/bilal/wow17/src/main/java/poc/networking/JsNetBridge.java` — Added `initiateConnection()`
+- `/home/bilal/wow17/target/teavm-js/classes.js` — **STALE**: built before Java changes, TeaVM build currently fails
 
 ## Next Steps Priority
 
-1. **Fix TeaVM JS compilation** — Resolve LambdaMetafactorySubstitutor NPE or work around by avoiding lambdas in compiled code
-2. **Fix browser JavaScript DataChannel stability bug** — The `onclose` handler should NOT trigger cleanup when DataChannel closes unexpectedly. Need to add a flag to prevent repeated cleanup/reconnect cycles.
-3. **Re-run E2E with Chrome** — Verify browser → WebRTC → proxy → TCP → Minecraft works with stable connection
-4. **Verify packet transmission** — Confirm HandshakeC2SPacket is sent and received by server
-5. **Confirm new entity ID assignment** — Server should assign new entity ID for successful login
+1. **Fix TeaVM JS compilation** — Resolve LambdaMetafactorySubstitutor NPE (TeaVM 0.13.1 bug) or find workaround
+   - Options: patch TeaVM, use older/newer version, or avoid triggering code path
+2. **Rebuild `classes.js`** with fresh compilation after fixing TeaVM issue
+3. **Fix browser JavaScript DataChannel stability bug** — The `onclose` handler triggers cleanup/reconnect cycle
+4. **Re-run E2E with Chrome** — Verify browser → WebRTC → proxy → TCP → Minecraft works
+5. **Verify packet transmission** — Confirm HandshakeC2SPacket is sent and received by server
+6. **Confirm new entity ID assignment** — Server should assign new entity ID for successful login
+
+## Key Lesson Learned
+
+**Source-level Java changes are NOT part of the browser E2E system until the TeaVM build successfully regenerates the deployed JavaScript artifact.**
+
+The Java code compiles and the logic is correct, but without a successful TeaVM build producing fresh `classes.js`, the browser cannot execute the new code. This creates a critical gap between "code is written" and "code is deployed".
