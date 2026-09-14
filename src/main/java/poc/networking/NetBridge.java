@@ -34,6 +34,10 @@ public final class NetBridge {
         NetBridge.connection = connection;
     }
 
+    public static MinecraftClientConnection getConnection() {
+        return connection;
+    }
+
     public static void clearConnection() {
         NetBridge.connection = null;
     }
@@ -185,6 +189,10 @@ public final class NetBridge {
         }
         JsNetBridge.joinServer(host, port);
         System.out.printf("[NetBridge] joinServer(%s, %d)%n", host, port);
+        // Initiate Minecraft protocol handshake
+        if (connection != null) {
+            connection.initiateHandshake(host, port);
+        }
     }
 
     public static boolean isOpen() {

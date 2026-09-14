@@ -461,6 +461,7 @@ public class MinecraftClientConnection {
         NetBridge.setPacketListener(listener);
         NetBridge.setNetworkState(getClientLoginNetworkState(listener));
         NetBridge.setConnection(this);
+        initiateHandshake(hostname, port);
     }
 
     public <S extends ServerPacketListener, C extends ClientPacketListener>
@@ -472,6 +473,42 @@ public class MinecraftClientConnection {
         NetBridge.setPacketListener(listener);
         NetBridge.setNetworkState(clientState);
         NetBridge.setConnection(this);
+        initiateHandshake(hostname, port);
+    }
+
+    /**
+     * Send the initial Handshake packet to the server as soon as the connection is established.
+     */
+    private void initiateHandshake(String hostname, int port) {
+        try {
+            java.lang.reflect.Method factoryMethod = clientStateFactoryClass.getMethod("handshakeState");
+            Object handshakeState = factoryMethod.invoke(null);
+            NetBridge.setNetworkState(handshakeState);
+            java.lang.reflect.Constructor<?> c =
+                Class.forName("net.minecraft.network.packet.c2s.handshake.HandshakeC2SPacket")
+                    .getConstructor(int.class, String.class, int.class,
+                        Class.forName("net.minecraft.network.packet.c2s.handshake.ConnectionIntent"));
+            HandshakeC2SPacket packet = (HandshakeC2SPacket) c.newInstance(767, hostname, port,
+                ClientConnectionIntent.LOGIN);
+            send(packet);
+            System.out.printf("[MCC] Initiated handshake to %s:%d%n", hostname, port);
+        } catch (Exception e) {
+            System.err.println("[MCC] Failed to initiate handshake: " + e);
+        }
+    }
+
+    // Reflection caches for reflectively-accessed classes
+    private static final Class<?> clientStateFactoryClass;
+    private static final Class<?> handshakePacketClass;
+    private static final Class<?> connectionIntentClass;
+    static {
+        Class<?> csf = null, hpc = null, cic = null;
+        try { csf = Class.forName("net.minecraft.network.state.LoginStates"); } catch (Exception ignored) {}
+        try { hpc = Class.forName("net.minecraft.network.packet.c2s.handshake.HandshakeC2SPacket"); } catch (Exception ignored) {}
+        try { cic = Class.forName("net.minecraft.network.packet.c2s.handshake.ConnectionIntent"); } catch (Exception ignored) {}
+        clientStateFactoryClass = csf;
+        handshakePacketClass = hpc;
+        connectionIntentClass = cic;
     }
 
     /**
