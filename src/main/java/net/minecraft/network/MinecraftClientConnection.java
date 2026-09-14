@@ -45,7 +45,12 @@ public class MinecraftClientConnection {
     private static final Object EPOLL_CLIENT_IO_GROUP = null;
     private static final Object LOCAL_CLIENT_IO_GROUP = null;
 
-    private static final Runnable EMPTY_RUNNABLE = () -> { };
+    private static final Runnable EMPTY_RUNNABLE = new Runnable() {
+        @Override
+        public void run() {
+            // empty
+        }
+    };
 
     // Instance fields
     private final NetworkSide side;
@@ -132,7 +137,15 @@ public class MinecraftClientConnection {
 
     public void send(Packet<?> packet, PacketCallbacks callbacks, boolean syncImmediately) {
         if (!NetBridge.isOpen()) {
-            queuedTasks.add(ctx -> sendInternal(packet, callbacks, syncImmediately));
+            final Packet<?> fPacket = packet;
+            final PacketCallbacks fCallbacks = callbacks;
+            final boolean fSyncImmediately = syncImmediately;
+            queuedTasks.add(new Consumer<MinecraftClientConnection>() {
+                @Override
+                public void accept(MinecraftClientConnection ctx) {
+                    ctx.sendInternal(fPacket, fCallbacks, fSyncImmediately);
+                }
+            });
             return;
         }
         sendInternal(packet, callbacks, syncImmediately);
@@ -479,7 +492,7 @@ public class MinecraftClientConnection {
     /**
      * Send the initial Handshake packet to the server as soon as the connection is established.
      */
-    private void initiateHandshake(String hostname, int port) {
+    public void initiateHandshake(String hostname, int port) {
         try {
             java.lang.reflect.Method factoryMethod = clientStateFactoryClass.getMethod("handshakeState");
             Object handshakeState = factoryMethod.invoke(null);
@@ -488,9 +501,9 @@ public class MinecraftClientConnection {
                 Class.forName("net.minecraft.network.packet.c2s.handshake.HandshakeC2SPacket")
                     .getConstructor(int.class, String.class, int.class,
                         Class.forName("net.minecraft.network.packet.c2s.handshake.ConnectionIntent"));
-            HandshakeC2SPacket packet = (HandshakeC2SPacket) c.newInstance(767, hostname, port,
-                ClientConnectionIntent.LOGIN);
-            send(packet);
+            Object packet = c.newInstance(767, hostname, port,
+                connectionIntentClass.getField("LOGIN").get(null));
+            send((Packet<?>) packet);
             System.out.printf("[MCC] Initiated handshake to %s:%d%n", hostname, port);
         } catch (Exception e) {
             System.err.println("[MCC] Failed to initiate handshake: " + e);
