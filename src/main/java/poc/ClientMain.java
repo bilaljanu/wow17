@@ -89,7 +89,7 @@ public final class ClientMain {
 
         System.out.println("[ClientMain] Browser client bootstrap complete");
 
-        // Start the render loop
+        // Start the render loop (must bind JS callback first)
         RenderLoop.bindFrameCallback();
         RenderLoop.start();
     }

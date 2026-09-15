@@ -215,7 +215,7 @@ public final class GlStateManager {
     }
 
     public static void blendEquation(int mode) {
-        if (mode != blendEquationRgb) {
+        if (mode != blendEquationRgb || mode != blendEquationAlpha) {
             GlBridge.blendEquation(mode);
             blendEquationRgb = blendEquationAlpha = mode;
         }
