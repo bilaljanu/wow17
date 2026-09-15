@@ -6,7 +6,10 @@
  * - Frame time tracking
  * - Draw call counting
  * - Memory usage monitoring
- * - Benchmark scenario runner
+ * - Benchmark scenario runner (60 seconds)
+ * - Status detection (no-renderer | rendering | world-loaded | playable)
+ *
+ * Integrates with benchmark.js for extended metrics (percentiles, JSON export)
  */
 
 (function() {
@@ -23,8 +26,34 @@
         drawCalls: 0,
         startTime: 0,
         running: false,
-        enabled: false
+        enabled: false,
+        // Benchmark state
+        benchmarkRunning: false,
+        benchmarkStartTime: 0,
+        benchmarkDuration: 60000,
+        benchmarkElapsed: 0,
+        benchmarkScenario: 'standard',
+        benchmarkResults: null,
+        // World state
+        rendererActive: false,
+        worldLoaded: false,
+        chunksLoaded: 0,
+        totalChunks: 0,
+        playerMoving: false,
+        cameraTurning: false
     };
+
+    // ========== Status Detection ==========
+    /**
+     * Determine benchmark status from current conditions.
+     * @returns {string} no-renderer | rendering | world-loaded | playable
+     */
+    function getStatus() {
+        if (!state.rendererActive) return 'no-renderer';
+        if (!state.worldLoaded) return 'rendering';
+        if (state.worldLoaded && (state.playerMoving || state.cameraTurning)) return 'playable';
+        return 'world-loaded';
+    }
 
     // ========== FPS Calculation ==========
     function updateFPS(now) {
@@ -32,12 +61,9 @@
 
         const delta = now - state.lastTime;
         if (delta >= 1000) {
-            // Calculate FPS over the last second
             state.fps = Math.round((state.frames * 1000) / delta);
             state.minFps = Math.min(state.minFps, state.fps);
             state.maxFps = Math.max(state.maxFps, state.fps);
-
-            // Reset for next window
             state.frames = 0;
             state.lastTime = now;
         }
@@ -46,8 +72,7 @@
     // ========== Frame Time Tracking ==========
     function recordFrameTime(ms) {
         state.frameTimes.push(ms);
-        // Keep last 60 frames for percentile calculations
-        if (state.frameTimes.length > 60) {
+        if (state.frameTimes.length > 600) {
             state.frameTimes.shift();
         }
     }
@@ -62,7 +87,7 @@
 
     function getFrameTimeStats() {
         if (state.frameTimes.length === 0) {
-            return { avg: 0, p1: 0, p5: 0, min: 0, max: 0 };
+            return { avg: 0, p1: 0, p5: 0, max: 0 };
         }
         const sum = state.frameTimes.reduce((a, b) => a + b, 0);
         const avg = sum / state.frameTimes.length;
@@ -70,6 +95,7 @@
             avg: avg.toFixed(2),
             p1: getPercentile(state.frameTimes, 1).toFixed(2),
             p5: getPercentile(state.frameTimes, 5).toFixed(2),
+            p99: getPercentile(state.frameTimes, 99).toFixed(2),
             min: Math.min(...state.frameTimes).toFixed(2),
             max: Math.max(...state.frameTimes).toFixed(2)
         };
@@ -87,37 +113,50 @@
         return null;
     }
 
+    function getMemoryMb() {
+        const mem = getMemoryUsage();
+        if (!mem) return 0;
+        return Math.round((mem.used / 1024 / 1024) * 100) / 100;
+    }
+
     // ========== Benchmark Scenario ==========
     const benchmarks = {
-        /**
-         * Standard benchmark: 60 seconds of movement + camera turns.
-         * Run this for consistent comparisons.
-         */
         standard: {
             name: 'Standard Gameplay',
-            duration: 60000, // 60 seconds
-            description: 'Walk forward for 60s, turn camera periodically'
+            duration: 60000,
+            description: '60s of movement + camera turns + chunk loading'
         },
-
-        /**
-         * Stress test: maximum chunk loading + entities.
-         */
         stress: {
             name: 'Chunk Loading Stress',
             duration: 30000,
             description: 'Fast movement through newly generated terrain'
+        },
+        idle: {
+            name: 'Idle / Menu',
+            duration: 30000,
+            description: 'Static camera, no world loaded'
         }
     };
 
     let activeBenchmark = null;
     let benchmarkTimer = null;
 
+    // ========== Benchmark Result Template ==========
+    function createReportTemplate() {
+        return {
+            timestamp: new Date().toISOString(),
+            scenario: 'standard',
+            duration_ms: 60000,
+            fps: { avg: 0, min: 0, max: 0, p1: 0 },
+            frameTime: { avg_ms: 0, p1_ms: 0, p5_ms: 0, p99_ms: 0, max_ms: 0 },
+            drawCalls: 0,
+            memory_mb: 0,
+            status: 'no-renderer'
+        };
+    }
+
     // ========== Public API ==========
     window.PerfMonitor = {
-        /**
-         * Start the performance monitor.
-         * Call this at the beginning of the render loop.
-         */
         start() {
             if (state.running) return;
             state.running = true;
@@ -127,9 +166,6 @@
             console.log('[Perf] Monitor started');
         },
 
-        /**
-         * Stop the performance monitor.
-         */
         stop() {
             state.running = false;
             if (benchmarkTimer) {
@@ -139,12 +175,8 @@
             console.log('[Perf] Monitor stopped');
         },
 
-        /**
-         * Main loop tick - call from render loop.
-         */
         tick() {
             if (!state.running) return;
-
             const now = performance.now();
             const frameTime = now - state.lastTime;
             state.lastTime = now;
@@ -155,17 +187,10 @@
             requestAnimationFrame(() => this.tick());
         },
 
-        /**
-         * Record a draw call.
-         * Call after each drawArrays/drawElements.
-         */
         recordDrawCall() {
             state.drawCalls++;
         },
 
-        /**
-         * Get current stats object.
-         */
         getStats() {
             const ft = getFrameTimeStats();
             const mem = getMemoryUsage();
@@ -176,13 +201,15 @@
                 frameTime: ft,
                 drawCalls: state.drawCalls,
                 memory: mem,
-                elapsed: performance.now() - state.startTime
+                elapsed: performance.now() - state.startTime,
+                status: getStatus(),
+                rendererActive: state.rendererActive,
+                worldLoaded: state.worldLoaded,
+                playerMoving: state.playerMoving,
+                cameraTurning: state.cameraTurning
             };
         },
 
-        /**
-         * Reset all statistics.
-         */
         reset() {
             state.frames = 0;
             state.lastTime = performance.now();
@@ -195,15 +222,13 @@
             console.log('[Perf] Stats reset');
         },
 
-        /**
-         * Print detailed report to console.
-         */
         report() {
             const stats = this.getStats();
             const mem = stats.memory;
             console.log('=== PERFORMANCE REPORT ===');
+            console.log(`Status: ${stats.status}`);
             console.log(`FPS: avg=${stats.fps} min=${stats.minFps} max=${stats.maxFps}`);
-            console.log(`Frame Time: avg=${stats.frameTime.avg}ms p1=${stats.frameTime.p1}ms p5=${stats.frameTime.p5}ms`);
+            console.log(`Frame Time: avg=${stats.frameTime.avg}ms p1=${stats.frameTime.p1}ms p5=${stats.frameTime.p5}ms p99=${stats.frameTime.p99}ms`);
             console.log(`Frame Time Range: ${stats.frameTime.min}ms - ${stats.frameTime.max}ms`);
             console.log(`Draw Calls: ${stats.drawCalls}`);
             if (mem) {
@@ -213,10 +238,6 @@
             console.log('==========================');
         },
 
-        /**
-         * Start a named benchmark scenario.
-         * Automatically reports when complete.
-         */
         runBenchmark(name) {
             const bench = benchmarks[name];
             if (!bench) {
@@ -225,6 +246,10 @@
             }
 
             activeBenchmark = bench;
+            state.benchmarkRunning = true;
+            state.benchmarkStartTime = performance.now();
+            state.benchmarkDuration = bench.duration;
+            state.benchmarkScenario = name;
             this.reset();
             this.start();
 
@@ -233,26 +258,47 @@
 
             benchmarkTimer = setTimeout(() => {
                 this.stop();
+                state.benchmarkRunning = false;
                 this.report();
                 activeBenchmark = null;
                 benchmarkTimer = null;
             }, bench.duration);
         },
 
-        /**
-         * Check if a benchmark is currently running.
-         */
         isBenchmarkRunning() {
             return activeBenchmark !== null;
         },
 
-        /**
-         * Get benchmark progress (0-1).
-         */
         getBenchmarkProgress() {
             if (!activeBenchmark) return 0;
             const elapsed = performance.now() - state.startTime;
             return Math.min(1, elapsed / activeBenchmark.duration);
+        },
+
+        // --- Renderer/World State Setters ---
+        setRendererActive(active) {
+            state.rendererActive = active;
+        },
+
+        setWorldState(loaded, chunksLoaded, totalChunks) {
+            state.worldLoaded = loaded;
+            state.chunksLoaded = chunksLoaded || 0;
+            state.totalChunks = totalChunks || 0;
+        },
+
+        setPlayerInput(moving, turning) {
+            state.playerMoving = moving;
+            state.cameraTurning = turning;
+        },
+
+        // --- Report Template ---
+        getReportTemplate() {
+            return createReportTemplate();
+        },
+
+        // --- Status ---
+        getStatus() {
+            return getStatus();
         }
     };
 
@@ -260,6 +306,7 @@
     window.__perfOverlayEnabled = false;
     window.__perfReset = window.PerfMonitor.reset;
     window.__perfReport = window.PerfMonitor.report;
+    window.__benchmarkTemplate = createReportTemplate;
 
     console.log('[Perf] Performance monitor initialized');
 })();
