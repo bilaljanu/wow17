@@ -88,18 +88,34 @@ public final class JsNetBridge {
         System.out.println("[RUNTIME C] Dispatching packet " + packetId);
     }
 
+    /**
+     * Scratch buffer for readVarIntInfo to avoid per-call allocations.
+     * Single-threaded context (browser main thread), safe to reuse.
+     */
+    private static final int[] VAR_INT_SCRATCH = new int[2];
+
     private static int[] readVarIntInfo(byte[] buf, int offset) {
         int result = 0;
         int shift = 0;
         int current;
         do {
-            if (offset >= buf.length) return new int[]{result, offset};
+            if (offset >= buf.length) {
+                VAR_INT_SCRATCH[0] = result;
+                VAR_INT_SCRATCH[1] = offset;
+                return VAR_INT_SCRATCH;
+            }
             current = buf[offset++] & 0xFF;
             result |= (current & 0x7F) << shift;
             shift += 7;
-            if (shift > 28) return new int[]{-1, offset};
+            if (shift > 28) {
+                VAR_INT_SCRATCH[0] = -1;
+                VAR_INT_SCRATCH[1] = offset;
+                return VAR_INT_SCRATCH;
+            }
         } while ((current & 0x80) != 0);
-        return new int[]{result, offset};
+        VAR_INT_SCRATCH[0] = result;
+        VAR_INT_SCRATCH[1] = offset;
+        return VAR_INT_SCRATCH;
     }
 
     /**

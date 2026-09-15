@@ -430,18 +430,29 @@ public final class NetBridge {
     // --- VarInt utilities ----------------------------------------------------
 
     /**
-     * Read a VarInt from {@code buf[offset]} and return [value, newOffset].
-     * Fast-path for small values (0-127) which are single-byte VarInts.
+     * Scratch buffer for readVarIntInfo to avoid per-call allocations.
+     * Single-threaded context (browser main thread), safe to reuse.
+     */
+    private static final int[] VAR_INT_SCRATCH = new int[2];
+
+    /**
+     * Read a VarInt from {@code buf[offset]} and store [value, newOffset]
+     * into the provided scratch array. Returns the same array reference.
+     * Zero allocations per call.
      */
     public static int[] readVarIntInfo(byte[] buf, int offset) {
         if (offset >= buf.length) {
-            return new int[]{0, offset};
+            VAR_INT_SCRATCH[0] = 0;
+            VAR_INT_SCRATCH[1] = offset;
+            return VAR_INT_SCRATCH;
         }
 
         int current = buf[offset] & 0xFF;
         // Fast path: single-byte VarInt (0-127)
         if ((current & 0x80) == 0) {
-            return new int[]{current, offset + 1};
+            VAR_INT_SCRATCH[0] = current;
+            VAR_INT_SCRATCH[1] = offset + 1;
+            return VAR_INT_SCRATCH;
         }
 
         // Multi-byte VarInt - fall back to original algorithm
@@ -451,17 +462,23 @@ public final class NetBridge {
 
         do {
             if (pos >= buf.length) {
-                return new int[]{result, pos};
+                VAR_INT_SCRATCH[0] = result;
+                VAR_INT_SCRATCH[1] = pos;
+                return VAR_INT_SCRATCH;
             }
             current = buf[pos++] & 0xFF;
             result |= (current & 0x7F) << shift;
             shift += 7;
             if (shift > 28) {
-                return new int[]{-1, pos};
+                VAR_INT_SCRATCH[0] = -1;
+                VAR_INT_SCRATCH[1] = pos;
+                return VAR_INT_SCRATCH;
             }
         } while ((current & 0x80) != 0);
 
-        return new int[]{result, pos};
+        VAR_INT_SCRATCH[0] = result;
+        VAR_INT_SCRATCH[1] = pos;
+        return VAR_INT_SCRATCH;
     }
 
     public static int readVarInt(byte[] buf, int offset) {
