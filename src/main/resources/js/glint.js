@@ -44,7 +44,7 @@ if (!gl) {
 }
 
 // Wrap the WebGL2RenderingContext in a JSO-compatible object
-function createWebGL2 ContextWrapper() {
+function createWebGL2ContextWrapper() {
     const self = Object.create(null);
 
     // Viewport
