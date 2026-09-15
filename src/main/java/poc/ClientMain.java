@@ -3,6 +3,7 @@ package poc;
 import poc.networking.NetBridge;
 import poc.networking.JsNetBridge;
 import poc.networking.LocalNetBridge;
+import poc.rendering.RenderLoop;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.network.MinecraftClientConnection;
 import org.teavm.jso.typedarrays.Uint8Array;
@@ -78,6 +79,18 @@ public final class ClientMain {
             System.out.println("[ClientMain] exportCallJoinServer called (DCE prevention only): " + e.getMessage());
         }
 
+        // Explicitly call initiateHandshake to prevent TeaVM DCE
+        // This ensures the method survives dead-code elimination and appears in classes.js
+        try {
+            connection.initiateHandshake("localhost", 0);
+        } catch (Exception e) {
+            System.out.println("[ClientMain] initiateHandshake called (DCE prevention only): " + e.getMessage());
+        }
+
         System.out.println("[ClientMain] Browser client bootstrap complete");
+
+        // Start the render loop
+        RenderLoop.bindFrameCallback();
+        RenderLoop.start();
     }
 }
