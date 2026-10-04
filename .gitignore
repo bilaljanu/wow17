@@ -1,0 +1,118 @@
+# Build outputs
+build/
+target/
+stubs-out/
+META-INF/
+Test.class
+Test.java
+*.class
+*.jar
+*.jar.backup
+*.jar.bak
+*.jar.bak-*
+*.jar.moved
+*.tmp
+*.original
+*.bak
+
+# Node modules
+node_modules/
+package-lock.json
+
+# JDK / Maven / tools
+tools/
+
+# Java compilation cache
+java/
+net/
+org/
+
+# Large server files
+server-1.21.1.jar
+extracted-server.jar
+pom.xml.fixed
+pom.xml.tmp
+pom.xml.original
+pom.xml.bak
+
+# Test server and world
+test-server/
+test-server.jar
+purpur-test/
+world/
+crash-reports/
+logs/
+*.log
+*.log.gz
+*.pid
+
+# Data files (non-source)
+assets/
+data/
+input/
+
+# Dashboard runtime logs
+dashboard/*.log
+dashboard/__pycache__/
+dashboard/server.log
+dashboard/watchdog.log
+dashboard/index.html.bak
+
+# Claude / agent workspace
+.claude/
+.opencode/
+
+# Temp files
+tmp/
+
+# Misc untracked JS test files (keep source, drop one-offs)
+debug_protocol.js
+debug_proxy_test.js
+direct_test.js
+e2e_test.js
+e2e_test_v2.js
+e2e_webrtc_test.js
+full_e2e_test.js
+proxy.log
+subagent.md
+test_*.js
+test-final.js
+test-mc-connection.js
+test-netbridge-packets.js
+test_pipeline_simple.js
+test_sdp.js
+test_send_final.js
+test_send_packets.js
+test_simple.js
+test_simple.mjs
+test_state.js
+test_slow.js
+
+# Server config artifacts
+banned-ips.json
+banned-players.json
+ops.json
+whitelist.json
+usercache.json
+server.properties
+server.properties.bak
+server.log
+server_fresh.log
+proxy.pid
+server.pid
+eula.txt
+
+# Documentation snapshots
+CLI_FINAL_REPORT.md
+E2E_FINAL_REPORT.md
+E2E_STATUS.md
+INTEGRATION_TEST_MATRIX.md
+PROJECT_STATE.md
+REAL_INTEGRATION_TEST.md
+SPIRIT-INSTRUCTIONS.md
+AGENT_SANDBOX_INSTRUCTIONS.md
+MASTER_PROMPT.md
+PERFORMANCE-ARCH.md
+PLUGIN_FINAL_REPORT.md
+STATUS.md
+project_summary.json
