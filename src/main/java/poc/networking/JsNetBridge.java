@@ -158,21 +158,21 @@ public final class JsNetBridge {
     @JSBody(params = {"host", "port"}, script = "if (window.NetBridgeBridge && window.NetBridgeBridge.onJoinServer) { window.NetBridgeBridge.onJoinServer(host, port); }")
     public static native void javaJoinServer(String host, int port);
 
+    /** Expose initiateHandshake to JavaScript */
+    @JSBody(params = {"hostname", "port"}, script = "if (window.NetBridgeBridge && window.NetBridgeBridge.onInitiateHandshake) { window.NetBridgeBridge.onInitiateHandshake(hostname, port); }")
+    public static native void exportInitiateHandshake(String hostname, int port);
+
+    /** Call NetBridge.initiateHandshake from Java - triggered by JS via exportInitiateHandshake */
+    public static void callInitiateHandshake(String hostname, int port) {
+        NetBridge.initiateHandshake(hostname, port);
+    }
+
+    /** Export callInitiateHandshake to JavaScript */
+    @JSBody(params = {}, script = "window.JsNetBridge_callInitiateHandshake = pn_JsNetBridge_callInitiateHandshake;")
+    public static native void exportCallInitiateHandshake();
+
     /** Call NetBridge.joinServer from Java - this triggers the actual Minecraft protocol handshake */
     public static void callJoinServer(String host, int port) {
         NetBridge.joinServer(host, port);
-    }
-
-    /**
-     * Browser-facing entry point: triggers the Minecraft client connection initiation.
-     * Called from JavaScript when the user clicks Join Server.
-     */
-    public static void initiateConnection(String host, int port) {
-        if (NetBridge.getConnection() == null) {
-            System.err.println("[JsNetBridge] Cannot initiate: MinecraftClientConnection is null");
-            return;
-        }
-        System.out.printf("[JsNetBridge] initiateConnection(%s, %d)%n", host, port);
-        NetBridge.getConnection().initiateHandshake(host, port);
     }
 }

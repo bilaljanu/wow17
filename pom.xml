@@ -21,7 +21,7 @@
       <artifactId>mc-named</artifactId>
       <version>1.21.1</version>
       <scope>system</scope>
-      <systemPath>${project.basedir}/build/mc-patched-stubbed.jar</systemPath>
+      <systemPath>${project.basedir}/build/mc-remapped.jar</systemPath>
     </dependency>
     <!-- Compat stubs -->
     <dependency>
@@ -172,7 +172,7 @@
                     <pathelement path="${project.basedir}/build/patcher-classes"/>
                     <pathelement path="${project.basedir}/tools/asm-9.6.jar"/>
                     <pathelement path="${project.basedir}/tools/asm-tree-9.6.jar"/>
-                    <pathelement path="${project.basedir}/build/mc-named.jar"/>
+                    <pathelement path="${project.basedir}/build/mc-remapped.jar"/>
                     <pathelement path="${project.basedir}/build/compat-stubs.jar"/>
                     <fileset dir="${project.basedir}/input/libs">
                       <include name="**/*.jar"/>
@@ -184,8 +184,8 @@
                     <pathelement path="${settings.localRepository}/org/ow2/asm/asm-tree/9.6/asm-tree-9.6.jar"/>
                     <pathelement path="${settings.localRepository}/org/ow2/asm/asm-analysis/9.6/asm-analysis-9.6.jar"/>
                   </classpath>
-                  <arg value="${project.basedir}/build/mc-named.jar"/>
-                  <arg value="${project.basedir}/build/mc-patched-stubbed.jar"/>
+                  <arg value="${project.basedir}/build/mc-remapped.jar"/>
+                  <arg value="${project.basedir}/build/mc-remapped.jar"/>
                 </java>
               </target>
             </configuration>

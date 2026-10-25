@@ -34,10 +34,6 @@ public final class NetBridge {
         NetBridge.connection = connection;
     }
 
-    public static MinecraftClientConnection getConnection() {
-        return connection;
-    }
-
     public static void clearConnection() {
         NetBridge.connection = null;
     }
@@ -189,14 +185,22 @@ public final class NetBridge {
         }
         JsNetBridge.joinServer(host, port);
         System.out.printf("[NetBridge] joinServer(%s, %d)%n", host, port);
-        // Initiate Minecraft protocol handshake
-        if (connection != null) {
-            connection.initiateHandshake(host, port);
-        }
     }
 
     public static boolean isOpen() {
         return open;
+    }
+
+    /**
+     * Initiate the Handshake packet to the server with protocol version 767.
+     */
+    public static void initiateHandshake(String hostname, int port) {
+        MinecraftClientConnection conn = connection;
+        if (conn == null) {
+            System.err.println("[NetBridge] No connection for initiateHandshake");
+            return;
+        }
+        conn.initiateHandshake(hostname, port);
     }
 
     // --- Frame dispatch ------------------------------------------------------

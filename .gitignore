@@ -23,9 +23,9 @@ package-lock.json
 tools/
 
 # Java compilation cache
-java/
-net/
-org/
+# java/
+# net/
+# org/
 
 # Large server files
 server-1.21.1.jar

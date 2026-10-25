@@ -1,6 +1,8 @@
 {
   "dependencies": {
     "@roamhq/wrtc": "^0.10.0",
+    "chrome-remote-interface": "^0.34.0",
+    "fernflower": "^1.1.0",
     "mcjs": "^2.0.0",
     "mcprotocol": "^0.1.2",
     "minecraft-protocol": "^1.68.0",

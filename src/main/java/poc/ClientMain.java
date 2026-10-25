@@ -72,6 +72,21 @@ public final class ClientMain {
             System.out.println("[ClientMain] callJoinServer called (DCE prevention only): " + e.getMessage());
         }
 
+        // Explicitly call initiateHandshake to prevent TeaVM DCE
+        // This ensures the method survives and appears in classes.js
+        try {
+            connection.initiateHandshake("localhost", 0);
+        } catch (Exception e) {
+            System.out.println("[ClientMain] initiateHandshake called (DCE prevention only): " + e.getMessage());
+        }
+
+        // Export callInitiateHandshake to JavaScript
+        try {
+            JsNetBridge.exportCallInitiateHandshake();
+        } catch (Exception e) {
+            System.out.println("[ClientMain] exportCallInitiateHandshake called (DCE prevention only): " + e.getMessage());
+        }
+
         // Export callJoinServer to JavaScript
         try {
             JsNetBridge.exportCallJoinServer();

@@ -3,6 +3,7 @@ package poc.patch;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Opcodes;
+import org.objectweb.asm.ClassVisitor;
 
 import java.io.IOException;
 import java.io.InputStream;

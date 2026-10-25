@@ -6,7 +6,7 @@ import net.minecraft.text.Text;
 import net.minecraft.network.listener.*;
 import net.minecraft.network.NetworkState;
 import net.minecraft.network.packet.Packet;
-import net.minecraft.network.PacketCallbacks;
+// import net.minecraft.network.PacketCallbacks;
 import net.minecraft.network.handler.NetworkStateTransitions;
 import net.minecraft.network.handler.PacketSizeLogger;
 import net.minecraft.network.handler.PacketEncoderException;
@@ -45,12 +45,18 @@ public class MinecraftClientConnection {
     private static final Object EPOLL_CLIENT_IO_GROUP = null;
     private static final Object LOCAL_CLIENT_IO_GROUP = null;
 
-    private static final Runnable EMPTY_RUNNABLE = new Runnable() {
-        @Override
-        public void run() {
-            // empty
-        }
-    };
+    private static final Runnable EMPTY_RUNNABLE = () -> { };
+
+    // Reflection caches for reflectively-accessed classes
+    private static final Class<?> handshakePacketClass;
+    private static final Class<?> connectionIntentClass;
+    static {
+        Class<?> hpc = null, cic = null;
+        try { hpc = Class.forName("net.minecraft.network.packet.c2s.handshake.HandshakeC2SPacket"); } catch (Exception ignored) {}
+        try { cic = Class.forName("net.minecraft.network.packet.c2s.handshake.ConnectionIntent"); } catch (Exception ignored) {}
+        handshakePacketClass = hpc;
+        connectionIntentClass = cic;
+    }
 
     // Instance fields
     private final NetworkSide side;
@@ -137,15 +143,7 @@ public class MinecraftClientConnection {
 
     public void send(Packet<?> packet, PacketCallbacks callbacks, boolean syncImmediately) {
         if (!NetBridge.isOpen()) {
-            final Packet<?> fPacket = packet;
-            final PacketCallbacks fCallbacks = callbacks;
-            final boolean fSyncImmediately = syncImmediately;
-            queuedTasks.add(new Consumer<MinecraftClientConnection>() {
-                @Override
-                public void accept(MinecraftClientConnection ctx) {
-                    ctx.sendInternal(fPacket, fCallbacks, fSyncImmediately);
-                }
-            });
+            queuedTasks.add(ctx -> sendInternal(packet, callbacks, syncImmediately));
             return;
         }
         sendInternal(packet, callbacks, syncImmediately);
@@ -474,7 +472,6 @@ public class MinecraftClientConnection {
         NetBridge.setPacketListener(listener);
         NetBridge.setNetworkState(getClientLoginNetworkState(listener));
         NetBridge.setConnection(this);
-        initiateHandshake(hostname, port);
     }
 
     public <S extends ServerPacketListener, C extends ClientPacketListener>
@@ -486,42 +483,37 @@ public class MinecraftClientConnection {
         NetBridge.setPacketListener(listener);
         NetBridge.setNetworkState(clientState);
         NetBridge.setConnection(this);
-        initiateHandshake(hostname, port);
     }
 
     /**
      * Send the initial Handshake packet to the server as soon as the connection is established.
      */
     public void initiateHandshake(String hostname, int port) {
+        if (handshakePacketClass == null || connectionIntentClass == null) {
+            System.err.println("[MCC] Handshake classes not available");
+            return;
+        }
         try {
-            java.lang.reflect.Method factoryMethod = clientStateFactoryClass.getMethod("handshakeState");
-            Object handshakeState = factoryMethod.invoke(null);
-            NetBridge.setNetworkState(handshakeState);
             java.lang.reflect.Constructor<?> c =
-                Class.forName("net.minecraft.network.packet.c2s.handshake.HandshakeC2SPacket")
-                    .getConstructor(int.class, String.class, int.class,
-                        Class.forName("net.minecraft.network.packet.c2s.handshake.ConnectionIntent"));
-            Object packet = c.newInstance(767, hostname, port,
-                connectionIntentClass.getField("LOGIN").get(null));
+                handshakePacketClass.getConstructor(int.class, String.class, int.class, connectionIntentClass);
+            // Use reflection to get LOGIN constant
+            java.lang.reflect.Field loginField = null;
+            for (java.lang.reflect.Field f : connectionIntentClass.getFields()) {
+                if ("LOGIN".equals(f.getName())) {
+                    loginField = f;
+                    break;
+                }
+            }
+            if (loginField == null) {
+                // Fallback: use field_44975 which is LOGIN in this build
+                loginField = connectionIntentClass.getField("field_44975");
+            }
+            Object packet = c.newInstance(767, hostname, port, loginField.get(null));
             send((Packet<?>) packet);
             System.out.printf("[MCC] Initiated handshake to %s:%d%n", hostname, port);
         } catch (Exception e) {
             System.err.println("[MCC] Failed to initiate handshake: " + e);
         }
-    }
-
-    // Reflection caches for reflectively-accessed classes
-    private static final Class<?> clientStateFactoryClass;
-    private static final Class<?> handshakePacketClass;
-    private static final Class<?> connectionIntentClass;
-    static {
-        Class<?> csf = null, hpc = null, cic = null;
-        try { csf = Class.forName("net.minecraft.network.state.LoginStates"); } catch (Exception ignored) {}
-        try { hpc = Class.forName("net.minecraft.network.packet.c2s.handshake.HandshakeC2SPacket"); } catch (Exception ignored) {}
-        try { cic = Class.forName("net.minecraft.network.packet.c2s.handshake.ConnectionIntent"); } catch (Exception ignored) {}
-        clientStateFactoryClass = csf;
-        handshakePacketClass = hpc;
-        connectionIntentClass = cic;
     }
 
     /**
