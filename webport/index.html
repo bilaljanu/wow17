@@ -1218,7 +1218,7 @@ function decodeNbtText(bytes) {
             },
             onJoinServer: function (host, port) {
                 console.log('[WebRTC] joinServer called with ' + host + ':' + port);
-                connectToProxy('localhost', 8766);
+                connectToProxy(window.location.hostname, 8766);
             }
         };
 
@@ -1387,7 +1387,7 @@ function decodeNbtText(bytes) {
         document.getElementById('connectBtn').addEventListener('click', function () {
             document.getElementById('connectBtn').disabled = true;
             document.getElementById('disconnectBtn').disabled = false;
-            connectToProxy('localhost', 8766);
+            connectToProxy(window.location.hostname, 8766);
         });
 
         // ?auto=1 connects on load, which lets a test drive the page by navigating
@@ -1399,7 +1399,7 @@ function decodeNbtText(bytes) {
                 setTimeout(function () {
                     document.getElementById('connectBtn').disabled = true;
                     document.getElementById('disconnectBtn').disabled = false;
-                    connectToProxy('localhost', 8766);
+                    connectToProxy(window.location.hostname, 8766);
                 }, 300);
             }
         })();

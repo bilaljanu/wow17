@@ -10,7 +10,8 @@ import java.util.jar.*;
 
 /**
  * Merges inner class entries from source jar into target jar.
- * This restores missing inner classes that were dropped during deobfuscation.
+ * Restores missing inner classes that were dropped during deobfuscation.
+ * Uses a sorted entry list to ensure reproducible output.
  */
 public final class MergeInnerClasses {
     public static void main(String[] args) throws IOException {
@@ -23,16 +24,16 @@ public final class MergeInnerClasses {
         Path target = Paths.get(args[1]);
         Path output = Paths.get(args[2]);
         
-        Map<String, byte[]> entries = new HashMap<>();
+        Map<String, byte[]> entries = new TreeMap<>();
         int added = 0;
         
-        // Read target jar
+        // Read target jar first
         try (JarFile jar = new JarFile(target.toFile())) {
             Enumeration<JarEntry> e = jar.entries();
             while (e.hasMoreElements()) {
                 JarEntry je = e.nextElement();
                 String name = je.getName();
-                if (!name.endsWith("/")) {
+                if (!name.endsWith("/") && !entries.containsKey(name)) {
                     try (InputStream is = jar.getInputStream(je)) {
                         entries.put(name, is.readAllBytes());
                     }

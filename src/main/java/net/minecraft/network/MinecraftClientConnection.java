@@ -260,23 +260,49 @@ public class MinecraftClientConnection {
             return;
         }
         try {
-            java.lang.reflect.Constructor<?> c =
-                handshakePacketClass.getConstructor(int.class, String.class, int.class, connectionIntentClass);
+            // Try getConstructor first
+            java.lang.reflect.Constructor<?> c = null;
+            try {
+                c = handshakePacketClass.getConstructor(int.class, String.class, int.class, connectionIntentClass);
+            } catch (NoSuchMethodException e1) {
+                // Fallback: search declared constructors for one with 4 params
+                for (java.lang.reflect.Constructor<?> ctor : handshakePacketClass.getDeclaredConstructors()) {
+                    if (ctor.getParameterCount() == 4) {
+                        c = ctor;
+                        break;
+                    }
+                }
+            }
+            if (c == null) {
+                throw new NoSuchMethodException("No constructor with 4 params found");
+            }
+            c.setAccessible(true);
+
             java.lang.reflect.Field loginField = null;
+            // ClientIntent (obfuscated as aii) is an enum with constants a=STATUS, b=LOGIN, c=TRANSFER
             for (java.lang.reflect.Field f : connectionIntentClass.getFields()) {
-                if ("LOGIN".equals(f.getName())) {
+                if ("LOGIN".equals(f.getName()) || "b".equals(f.getName())) {
                     loginField = f;
                     break;
                 }
             }
             if (loginField == null) {
-                loginField = connectionIntentClass.getField("field_44975");
+                // Fallback: try the second enum constant (index 1 = LOGIN)
+                java.lang.reflect.Field[] fields = connectionIntentClass.getFields();
+                if (fields.length >= 2) {
+                    loginField = fields[1];
+                }
             }
+            if (loginField == null) {
+                throw new NoSuchFieldException("LOGIN field not found");
+            }
+            loginField.setAccessible(true);
             Object packet = c.newInstance(767, hostname, port, loginField.get(null));
             send(packet);
             System.out.printf("[MCC] Initiated handshake to %s:%d%n", hostname, port);
         } catch (Exception e) {
             System.err.println("[MCC] Failed to initiate handshake: " + e);
+            e.printStackTrace();
         }
     }
 
