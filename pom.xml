@@ -21,7 +21,7 @@
       <artifactId>mc-named</artifactId>
       <version>1.21.1</version>
       <scope>system</scope>
-      <systemPath>${project.basedir}/build/mc-remapped-normalized.jar</systemPath>
+      <systemPath>${project.basedir}/build/mc-remapped-complete.jar</systemPath>
     </dependency>
     <!-- Compat stubs -->
     <dependency>
@@ -185,7 +185,25 @@
                     <pathelement path="${settings.localRepository}/org/ow2/asm/asm-analysis/9.6/asm-analysis-9.6.jar"/>
                   </classpath>
                   <arg value="${project.basedir}/build/mc-remapped.jar"/>
-                  <arg value="${project.basedir}/build/mc-remapped-normalized.jar"/>
+                  <arg value="${project.basedir}/build/mc-remapped-complete.jar"/>
+                </java>
+              </target>
+            </configuration>
+          </execution>
+          <!-- Merge missing inner classes from source client jar -->
+          <execution>
+            <id>merge-inner-classes</id>
+            <phase>generate-sources</phase>
+            <goals><goal>run</goal></goals>
+            <configuration>
+              <target>
+                <java classname="poc.patch.MergeInnerClasses" fork="true">
+                  <classpath>
+                    <pathelement path="${project.basedir}/build/patcher-classes"/>
+                  </classpath>
+                  <arg value="${project.basedir}/build/client-1.21.1.jar"/>
+                  <arg value="${project.basedir}/build/mc-remapped.jar"/>
+                  <arg value="${project.basedir}/build/mc-remapped-complete.jar"/>
                 </java>
               </target>
             </configuration>
