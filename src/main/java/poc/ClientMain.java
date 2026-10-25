@@ -2,9 +2,7 @@ package poc;
 
 import poc.networking.NetBridge;
 import poc.networking.JsNetBridge;
-import poc.networking.LocalNetBridge;
 import poc.rendering.RenderLoop;
-import net.minecraft.client.MinecraftClient;
 import net.minecraft.network.MinecraftClientConnection;
 import org.teavm.jso.typedarrays.Uint8Array;
 
