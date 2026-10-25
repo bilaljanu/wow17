@@ -21,7 +21,7 @@
       <artifactId>mc-named</artifactId>
       <version>1.21.1</version>
       <scope>system</scope>
-      <systemPath>${project.basedir}/build/mc-remapped.jar</systemPath>
+      <systemPath>${project.basedir}/build/mc-remapped-normalized.jar</systemPath>
     </dependency>
     <!-- Compat stubs -->
     <dependency>
@@ -185,7 +185,7 @@
                     <pathelement path="${settings.localRepository}/org/ow2/asm/asm-analysis/9.6/asm-analysis-9.6.jar"/>
                   </classpath>
                   <arg value="${project.basedir}/build/mc-remapped.jar"/>
-                  <arg value="${project.basedir}/build/mc-remapped.jar"/>
+                  <arg value="${project.basedir}/build/mc-remapped-normalized.jar"/>
                 </java>
               </target>
             </configuration>

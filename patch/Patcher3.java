@@ -11,7 +11,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.JarOutputStream;
@@ -24,6 +28,11 @@ import java.util.jar.JarOutputStream;
  *
  * Also replaces com.mojang.* classes with minimal stubs to avoid TeaVM LambdaMetafactory
  * analysis crashes on bytecode patterns that are not supported.
+ *
+ * Normalizes JAR entry paths: for each .class file, reads its internal JVM class name
+ * via ASM ClassReader.getClassName() and ensures the archive path matches (internal name + ".class").
+ * Preserves valid obfuscated root entries (e.g. aij.class) and non-class resources.
+ * Detects duplicate entries and class-name collisions before promotion.
  */
 public final class Patcher3 {
     public static void main(String[] args) throws IOException {
@@ -33,9 +42,13 @@ public final class Patcher3 {
         }
         Path in = Paths.get(args[0]);
         Path out = Paths.get(args[1]);
-        int classes = 0, skipped = 0, other = 0, stubbed = 0;
+        int classes = 0, skipped = 0, other = 0, stubbed = 0, normalized = 0;
+        List<String> duplicates = new ArrayList<>();
+        List<String> collisions = new ArrayList<>();
 
         Map<String, byte[]> contents = new HashMap<>();
+        Set<String> seenEntries = new HashSet<>();
+        Set<String> seenInternal = new HashSet<>();
         try (JarFile jar = new JarFile(in.toFile())) {
             var entries = jar.entries();
             while (entries.hasMoreElements()) {
@@ -55,8 +68,30 @@ public final class Patcher3 {
                 }
                 try (InputStream is = jar.getInputStream(e)) {
                     byte[] bytes = is.readAllBytes();
+                    String outName = name;
                     if (name.endsWith(".class")) {
-                        if ("net/minecraft/network/ClientConnection.class".equals(name)) {
+                        String internal = null;
+                        try {
+                            ClassReader cr = new ClassReader(bytes);
+                            internal = cr.getClassName();
+                        } catch (Exception ex) {
+                            // Not a valid class file; keep original name
+                            internal = null;
+                        }
+                        if (internal != null && !internal.isEmpty()) {
+                            // ASM getClassName() returns dotted form; JAR entries use slashes
+                            String normalizedPath = internal.replace('.', '/') + ".class";
+                            if (!normalizedPath.equals(name)) {
+                                normalized++;
+                            }
+                            outName = normalizedPath;
+                            // Detect class-name collisions
+                            if (seenInternal.contains(internal)) {
+                                collisions.add(internal);
+                            }
+                            seenInternal.add(internal);
+                        }
+                        if ("net/minecraft/network/ClientConnection.class".equals(outName)) {
                             // Replace ClientConnection with our WebRTC-based version
                             ClassReader cr = new ClassReader(bytes);
                             ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
@@ -73,9 +108,9 @@ public final class Patcher3 {
                             }, 0);
                             bytes = cw.toByteArray();
                             classes++;
-                        } else if (name.startsWith("com/mojang/")) {
+                        } else if (outName.startsWith("com/mojang/")) {
                             // Replace com.mojang classes with minimal stubs to avoid TeaVM LambdaMetafactory issues
-                            bytes = createMojangStub(name);
+                            bytes = createMojangStub(outName);
                             stubbed++;
                         } else {
                             // Copy all other classes as-is
@@ -84,20 +119,43 @@ public final class Patcher3 {
                     } else {
                         other++;
                     }
-                    contents.put(name, bytes);
+                    // Detect duplicate entries
+                    if (seenEntries.contains(outName)) {
+                        duplicates.add(outName);
+                    }
+                    seenEntries.add(outName);
+                    contents.put(outName, bytes);
                 }
             }
         }
+        // Report duplicates and collisions
+        if (!duplicates.isEmpty()) {
+            System.err.println("WARNING: duplicate entries detected: " + duplicates);
+        }
+        if (!collisions.isEmpty()) {
+            System.err.println("WARNING: class-name collisions detected: " + collisions);
+        }
+        // Fail on collisions (do not promote ambiguous output)
+        if (!collisions.isEmpty()) {
+            System.err.println("Patcher3: ABORTING due to class-name collisions");
+            System.exit(1);
+        }
         Files.createDirectories(out.getParent());
-        try (JarOutputStream jos = new JarOutputStream(Files.newOutputStream(out))) {
+        // Write to temp file first, then promote
+        Path tmp = out.resolveSibling(out.getFileName() + ".tmp");
+        try (JarOutputStream jos = new JarOutputStream(Files.newOutputStream(tmp))) {
             for (var entry : contents.entrySet()) {
                 jos.putNextEntry(new JarEntry(entry.getKey()));
                 jos.write(entry.getValue());
                 jos.closeEntry();
             }
         }
+        // Promote temp to final
+        Files.move(tmp, out, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         System.out.println("Patcher3: " + classes + " classes rewritten (ClientConnection only), "
-                + stubbed + " classes stubbed (com.mojang), " + other + " resources copied, " + skipped + " entries dropped -> " + out);
+                + stubbed + " classes stubbed (com.mojang), " + other + " resources copied, "
+                + skipped + " entries dropped, " + normalized + " entries normalized, "
+                + duplicates.size() + " duplicates, " + collisions.size() + " collisions -> " + out);
     }
 
     private static byte[] createMojangStub(String className) {
