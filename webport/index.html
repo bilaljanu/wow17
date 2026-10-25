@@ -1411,6 +1411,18 @@ function decodeNbtText(bytes) {
             document.getElementById('disconnectBtn').disabled = true;
         });
 
+
+    <!-- Load TeaVM compiled Java client -->
+    <script src="classes.js"></script>
+    <script>
+        // Call TeaVM main after classes.js loads
+        if (typeof window.main === 'function') {
+            console.log('[MC] Calling TeaVM main()');
+            window.main([]);
+        } else {
+            console.error('[MC] TeaVM main not found in window.main');
+        }
+    </script>
         updateStatus('Ready - click Connect', 'waiting');
     </script>
 </body>

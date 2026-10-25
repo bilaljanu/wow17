@@ -4,6 +4,8 @@ import poc.networking.NetBridge;
 import poc.networking.JsNetBridge;
 import poc.rendering.RenderLoop;
 import net.minecraft.network.MinecraftClientConnection;
+import net.minecraft.network.protocol.handshake.ClientIntentionPacket;
+import net.minecraft.network.protocol.handshake.ClientIntent;
 import org.teavm.jso.typedarrays.Uint8Array;
 
 /**

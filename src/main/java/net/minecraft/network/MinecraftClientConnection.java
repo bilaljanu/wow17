@@ -21,14 +21,21 @@ public class MinecraftClientConnection {
 
     private static final Runnable EMPTY_RUNNABLE = () -> { };
 
-    private static final Class<?> handshakePacketClass;
-    private static final Class<?> connectionIntentClass;
-    static {
-        Class<?> hpc = null, cic = null;
-        try { hpc = Class.forName("net.minecraft.network.packet.c2s.handshake.HandshakeC2SPacket"); } catch (Exception ignored) {}
-        try { cic = Class.forName("net.minecraft.network.packet.c2s.handshake.ConnectionIntent"); } catch (Exception ignored) {}
-        handshakePacketClass = hpc;
-        connectionIntentClass = cic;
+    private static volatile Class<?> handshakePacketClass;
+    private static volatile Class<?> connectionIntentClass;
+
+    private static void initHandshakeClasses() {
+        if (handshakePacketClass != null || connectionIntentClass != null) return;
+        try {
+            handshakePacketClass = Class.forName("net.minecraft.network.protocol.handshake.ClientIntentionPacket");
+        } catch (Exception e) {
+            System.err.println("[MCC] ClientIntentionPacket not found: " + e.getMessage());
+        }
+        try {
+            connectionIntentClass = Class.forName("net.minecraft.network.protocol.handshake.ClientIntent");
+        } catch (Exception e) {
+            System.err.println("[MCC] ClientIntent not found: " + e.getMessage());
+        }
     }
 
     private final Object side;
@@ -247,6 +254,7 @@ public class MinecraftClientConnection {
     }
 
     public void initiateHandshake(String hostname, int port) {
+        initHandshakeClasses();
         if (handshakePacketClass == null || connectionIntentClass == null) {
             System.err.println("[MCC] Handshake classes not available");
             return;
