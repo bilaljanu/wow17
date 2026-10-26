@@ -1,5 +1,6 @@
 package net.minecraft.network;
 
+
 import poc.networking.NetBridge;
 
 import java.lang.reflect.Method;
@@ -32,9 +33,10 @@ public class MinecraftClientConnection {
             System.err.println("[MCC] ClientIntentionPacket not found: " + e.getMessage());
         }
         try {
-            connectionIntentClass = Class.forName("net.minecraft.network.protocol.handshake.ClientIntent");
+            // aii is the obfuscated name for ClientIntent (enum with a=STATUS, b=LOGIN, c=TRANSFER)
+            connectionIntentClass = Class.forName("aii");
         } catch (Exception e) {
-            System.err.println("[MCC] ClientIntent not found: " + e.getMessage());
+            System.err.println("[MCC] ClientIntent (aii) not found: " + e.getMessage());
         }
     }
 
@@ -260,41 +262,26 @@ public class MinecraftClientConnection {
             return;
         }
         try {
-            // Try getConstructor first
-            java.lang.reflect.Constructor<?> c = null;
-            try {
-                c = handshakePacketClass.getConstructor(int.class, String.class, int.class, connectionIntentClass);
-            } catch (NoSuchMethodException e1) {
-                // Fallback: search declared constructors for one with 4 params
-                for (java.lang.reflect.Constructor<?> ctor : handshakePacketClass.getDeclaredConstructors()) {
-                    if (ctor.getParameterCount() == 4) {
-                        c = ctor;
-                        break;
-                    }
-                }
-            }
-            if (c == null) {
-                throw new NoSuchMethodException("No constructor with 4 params found");
-            }
+            // Use reflection since aii is in default package
+            java.lang.reflect.Constructor<?> c = handshakePacketClass.getConstructor(int.class, String.class, int.class, connectionIntentClass);
             c.setAccessible(true);
 
             java.lang.reflect.Field loginField = null;
-            // ClientIntent (obfuscated as aii) is an enum with constants a=STATUS, b=LOGIN, c=TRANSFER
+            // aii is an enum with constants a=STATUS, b=LOGIN, c=TRANSFER
             for (java.lang.reflect.Field f : connectionIntentClass.getFields()) {
-                if ("LOGIN".equals(f.getName()) || "b".equals(f.getName())) {
+                if ("b".equals(f.getName())) {
                     loginField = f;
                     break;
                 }
             }
             if (loginField == null) {
-                // Fallback: try the second enum constant (index 1 = LOGIN)
                 java.lang.reflect.Field[] fields = connectionIntentClass.getFields();
                 if (fields.length >= 2) {
                     loginField = fields[1];
                 }
             }
             if (loginField == null) {
-                throw new NoSuchFieldException("LOGIN field not found");
+                throw new NoSuchFieldException("LOGIN field not found in aii");
             }
             loginField.setAccessible(true);
             Object packet = c.newInstance(767, hostname, port, loginField.get(null));
