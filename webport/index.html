@@ -1412,6 +1412,20 @@ function decodeNbtText(bytes) {
         });
 
 
+    <!-- Game modules -->
+    <script src="js/camera.js"></script>
+    <script src="js/player.js"></script>
+    <script src="js/chunkRenderer.js"></script>
+    <script src="js/game.js"></script>
+    <script>
+        // Initialize the game after all modules load
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initGame);
+        } else {
+            initGame();
+        }
+    </script>
+
     <!-- Load TeaVM compiled Java client -->
     <script src="classes.js"></script>
     <script>
@@ -1422,8 +1436,6 @@ function decodeNbtText(bytes) {
         } else {
             console.error('[MC] TeaVM main not found in window.main');
         }
-    </script>
-        updateStatus('Ready - click Connect', 'waiting');
     </script>
 </body>
 </html>
